@@ -13,7 +13,6 @@ _amount_re = re.compile(r"""
     (?:\s+|$)                         # space or end
 """, re.VERBOSE)
 
-
 _mention_re = re.compile(r"^@[A-Za-z0-9_]{4,32}$")  # tg username rules (rough)
 
 
@@ -22,9 +21,9 @@ def _is_mention(token: str) -> bool:
 
 
 def parse_message(
-    text: str,
-    author_username: str,
-    session_participants: Iterable[str],
+        text: str,
+        author_username: str,
+        session_participants: Iterable[str],
 ) -> dict:
     """
     Форматы:
@@ -107,6 +106,10 @@ def parse_message(
         if p not in seen:
             seen.add(p)
             participants_unique.append(p)
+
+    for u in participants_unique:
+        if u not in session_participants:
+            raise ParseError(f"{u} немає в сесії. Додай через /add")
 
     return {
         "amount": amount,

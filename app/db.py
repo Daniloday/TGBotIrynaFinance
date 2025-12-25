@@ -16,8 +16,6 @@ class SQLiteRepo:
         c.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             chat_id INTEGER PRIMARY KEY,
-            name TEXT,
-            owner TEXT,
             created_at INTEGER
         )
         """)
@@ -50,34 +48,27 @@ class SQLiteRepo:
 
         self.conn.commit()
 
-    # ---------- sessions ----------
+    # ---------- session helpers ----------
+
+    def ensure_session(self, chat_id: int):
+        c = self.conn.cursor()
+        c.execute("INSERT OR IGNORE INTO sessions (chat_id, created_at) VALUES (?, ?)", (chat_id, int(time.time())))
+        self.conn.commit()
 
     def has_session(self, chat_id: int) -> bool:
         c = self.conn.cursor()
-        c.execute("SELECT 1 FROM sessions WHERE chat_id = ?", (chat_id,))
+        c.execute("SELECT chat_id FROM sessions WHERE chat_id = ?", (chat_id,))
         return c.fetchone() is not None
 
-    def create_session(self, chat_id: int, name: str, owner: str, participants: list[str]):
-        c = self.conn.cursor()
+    # ---------- participants ----------
 
+    def add_participant(self, chat_id: int, username: str):
+        self.ensure_session(chat_id)
+        c = self.conn.cursor()
         c.execute(
-            "INSERT OR REPLACE INTO sessions (chat_id, name, owner, created_at) VALUES (?, ?, ?, ?)",
-            (chat_id, name, owner, int(time.time())),
+            "INSERT OR IGNORE INTO participants (chat_id, username) VALUES (?, ?)",
+            (chat_id, username),
         )
-
-        c.execute("DELETE FROM participants WHERE chat_id = ?", (chat_id,))
-        for u in participants:
-            c.execute(
-                "INSERT INTO participants (chat_id, username) VALUES (?, ?)",
-                (chat_id, u),
-            )
-
-        self.conn.commit()
-
-    def delete_session(self, chat_id: int):
-        self.reset(chat_id)
-        c = self.conn.cursor()
-        c.execute("DELETE FROM sessions WHERE chat_id = ?", (chat_id,))
         self.conn.commit()
 
     def get_participants(self, chat_id: int) -> list[str]:
@@ -91,6 +82,7 @@ class SQLiteRepo:
     # ---------- expenses ----------
 
     def add_expense(self, chat_id: int, payer: str, amount: float, title: str, participants: list[str]):
+        self.ensure_session(chat_id)
         c = self.conn.cursor()
         c.execute(
             """
@@ -115,9 +107,10 @@ class SQLiteRepo:
             "SELECT * FROM expenses WHERE chat_id = ? ORDER BY created_at",
             (chat_id,),
         )
+        expenses = c.fetchall()
 
         result = []
-        for e in c.fetchall():
+        for e in expenses:
             c.execute(
                 "SELECT username FROM expense_participants WHERE expense_id = ?",
                 (e["id"],),
@@ -130,11 +123,14 @@ class SQLiteRepo:
                     "amount": e["amount"],
                     "title": e["title"],
                     "participants": parts,
+                    "created_at": e["created_at"],
                 }
             )
         return result
 
-    def reset(self, chat_id: int):
+    # ---------- delete / reset ----------
+
+    def delete_session(self, chat_id: int):
         c = self.conn.cursor()
 
         c.execute("SELECT id FROM expenses WHERE chat_id = ?", (chat_id,))
@@ -145,13 +141,29 @@ class SQLiteRepo:
 
         c.execute("DELETE FROM expenses WHERE chat_id = ?", (chat_id,))
         c.execute("DELETE FROM participants WHERE chat_id = ?", (chat_id,))
+        c.execute("DELETE FROM sessions WHERE chat_id = ?", (chat_id,))
+
         self.conn.commit()
+
+    # алиас для совместимости с любыми версиями main.py
+    def reset(self, chat_id: int):
+        self.delete_session(chat_id)
+
+    # ---------- session object ----------
 
     def load_session(self, chat_id: int) -> Session:
         participants = self.get_participants(chat_id)
-        session = Session(name=str(chat_id), participants=participants)
 
-        for e in self.list_expenses(chat_id):
+        session = Session(
+            name=str(chat_id),
+            participants=participants,
+        )
+
+        expenses = self.list_expenses(chat_id)
+        for e in expenses:
+            # ensure_users чтобы не падало если вдруг кто-то левый в expenses
+            session.ensure_users([e["payer"], *e["participants"]])
+
             session.add_expense(
                 Expense(
                     amount=e["amount"],
