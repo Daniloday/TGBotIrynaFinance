@@ -59,7 +59,7 @@ class Session:
 
         return net
 
-    def settlements(self) -> List[Tuple[str, str, float]]:
+    def calculate_transfers(self) -> List[Tuple[str, str, float]]:
         """
         Возвращает список переводов (debtor -> creditor, amount)
         """

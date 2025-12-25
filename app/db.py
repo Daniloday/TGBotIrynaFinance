@@ -2,6 +2,7 @@ import sqlite3
 import time
 import os
 from typing import List
+from app.session import Session, Expense
 
 
 class SQLiteRepo:
@@ -137,3 +138,24 @@ class SQLiteRepo:
         c.execute("DELETE FROM expenses WHERE chat_id = ?", (chat_id,))
         c.execute("DELETE FROM participants WHERE chat_id = ?", (chat_id,))
         self.conn.commit()
+
+    def load_session(self, chat_id: int) -> Session:
+        participants = self.get_participants(chat_id)
+
+        session = Session(
+            name=str(chat_id),
+            participants=participants,
+        )
+
+        expenses = self.list_expenses(chat_id)
+        for e in expenses:
+            session.add_expense(
+                Expense(
+                    amount=e["amount"],
+                    payer=e["payer"],
+                    participants=e["participants"],
+                    description=e["title"],
+                )
+            )
+
+        return session

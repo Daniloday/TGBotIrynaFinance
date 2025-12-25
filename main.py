@@ -156,6 +156,27 @@ async def handle_expense(message: Message):
         "Учасники: " + ", ".join(expense["participants"])
     )
 
+
+@dp.message(Command("calculate"))
+async def calculate_transfers(message: Message):
+    session = repo.load_session(message.chat.id)
+
+    if not session or not session.expenses:
+        await message.answer("Немає витрат.")
+        return
+
+    transfers = session.calculate_transfers()
+
+    if not transfers:
+        await message.answer("Ніхто нікому не винен ✅")
+        return
+
+    text = "💸 Хто кому скидає:\n"
+    for debtor, creditor, amount in transfers:
+        text += f"{debtor} → {creditor}: {amount:.2f} грн\n"
+
+    await message.answer(text)
+
 # --------------------
 # fallback
 # --------------------
