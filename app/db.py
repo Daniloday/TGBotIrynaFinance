@@ -1,15 +1,12 @@
 import sqlite3
 import time
 import os
-from typing import List
 from app.session import Session, Expense
 
 
 class SQLiteRepo:
     def __init__(self, db_path: str):
-        # гарантируем папку
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
 
@@ -19,6 +16,8 @@ class SQLiteRepo:
         c.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             chat_id INTEGER PRIMARY KEY,
+            name TEXT,
+            owner TEXT,
             created_at INTEGER
         )
         """)
@@ -51,14 +50,34 @@ class SQLiteRepo:
 
         self.conn.commit()
 
-    # ---------- participants ----------
+    # ---------- sessions ----------
 
-    def add_participant(self, chat_id: int, username: str):
+    def has_session(self, chat_id: int) -> bool:
         c = self.conn.cursor()
+        c.execute("SELECT 1 FROM sessions WHERE chat_id = ?", (chat_id,))
+        return c.fetchone() is not None
+
+    def create_session(self, chat_id: int, name: str, owner: str, participants: list[str]):
+        c = self.conn.cursor()
+
         c.execute(
-            "INSERT OR IGNORE INTO participants (chat_id, username) VALUES (?, ?)",
-            (chat_id, username),
+            "INSERT OR REPLACE INTO sessions (chat_id, name, owner, created_at) VALUES (?, ?, ?, ?)",
+            (chat_id, name, owner, int(time.time())),
         )
+
+        c.execute("DELETE FROM participants WHERE chat_id = ?", (chat_id,))
+        for u in participants:
+            c.execute(
+                "INSERT INTO participants (chat_id, username) VALUES (?, ?)",
+                (chat_id, u),
+            )
+
+        self.conn.commit()
+
+    def delete_session(self, chat_id: int):
+        self.reset(chat_id)
+        c = self.conn.cursor()
+        c.execute("DELETE FROM sessions WHERE chat_id = ?", (chat_id,))
         self.conn.commit()
 
     def get_participants(self, chat_id: int) -> list[str]:
@@ -71,14 +90,7 @@ class SQLiteRepo:
 
     # ---------- expenses ----------
 
-    def add_expense(
-        self,
-        chat_id: int,
-        payer: str,
-        amount: float,
-        title: str,
-        participants: list[str],
-    ):
+    def add_expense(self, chat_id: int, payer: str, amount: float, title: str, participants: list[str]):
         c = self.conn.cursor()
         c.execute(
             """
@@ -103,10 +115,9 @@ class SQLiteRepo:
             "SELECT * FROM expenses WHERE chat_id = ? ORDER BY created_at",
             (chat_id,),
         )
-        expenses = c.fetchall()
 
         result = []
-        for e in expenses:
+        for e in c.fetchall():
             c.execute(
                 "SELECT username FROM expense_participants WHERE expense_id = ?",
                 (e["id"],),
@@ -126,10 +137,7 @@ class SQLiteRepo:
     def reset(self, chat_id: int):
         c = self.conn.cursor()
 
-        c.execute(
-            "SELECT id FROM expenses WHERE chat_id = ?",
-            (chat_id,),
-        )
+        c.execute("SELECT id FROM expenses WHERE chat_id = ?", (chat_id,))
         ids = [r["id"] for r in c.fetchall()]
 
         for eid in ids:
@@ -141,14 +149,9 @@ class SQLiteRepo:
 
     def load_session(self, chat_id: int) -> Session:
         participants = self.get_participants(chat_id)
+        session = Session(name=str(chat_id), participants=participants)
 
-        session = Session(
-            name=str(chat_id),
-            participants=participants,
-        )
-
-        expenses = self.list_expenses(chat_id)
-        for e in expenses:
+        for e in self.list_expenses(chat_id):
             session.add_expense(
                 Expense(
                     amount=e["amount"],

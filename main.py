@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -10,17 +11,10 @@ from dotenv import load_dotenv
 from app.db import SQLiteRepo
 from app.parser import parse_message, ParseError
 
-# --------------------
-# bootstrap
-# --------------------
-
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PATH = os.getenv("DB_PATH", "data/iryna.db")
-
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN not set")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,141 +24,69 @@ dp = Dispatcher()
 repo = SQLiteRepo(DB_PATH)
 repo.init()
 
-# --------------------
-# helpers
-# --------------------
 
-def username_from_message(message: Message) -> str | None:
+def username(message: Message) -> str | None:
     if message.from_user and message.from_user.username:
         return f"@{message.from_user.username}"
     return None
 
 
-def auto_add_participant(message: Message):
-    username = username_from_message(message)
-    if username:
-        repo.add_participant(message.chat.id, username)
+# ---------- commands ----------
 
-# --------------------
-# commands
-# --------------------
+@dp.message(Command("new"))
+async def new_session(message: Message):
+    owner = username(message)
+    if not owner:
+        await message.answer("❌ У тебе немає username")
+        return
 
-@dp.message(Command("start"))
-async def cmd_start(message: Message):
-    auto_add_participant(message)
+    tokens = message.text.split()
+    mentions = [t for t in tokens if t.startswith("@")]
+    name_parts = [t for t in tokens[1:] if not t.startswith("@")]
+
+    if name_parts:
+        name = " ".join(name_parts)
+    else:
+        name = time.strftime("Сесія %d березня %H:%M")
+
+    participants = list(dict.fromkeys([owner] + mentions))
+
+    repo.create_session(message.chat.id, name, owner, participants)
+
     await message.answer(
-        "Привіт 👋\n"
-        "Я *Ірина* — рахую спільні витрати.\n\n"
-        "Формат:\n"
-        "`-450 піца`\n"
-        "`-120 таксі @ivan @anna`\n\n"
-        "Команди:\n"
-        "/members\n"
-        "/reset\n"
-        "/balance",
-        parse_mode="Markdown"
+        "✅ Сесію створено\n"
+        f"Назва: {name}\n"
+        "Учасники:\n" + "\n".join(f"• {u}" for u in participants)
     )
+
+
+@dp.message(Command("delete"))
+async def delete_session(message: Message):
+    if not repo.has_session(message.chat.id):
+        await message.answer("Немає активної сесії.")
+        return
+
+    repo.delete_session(message.chat.id)
+    await message.answer("🗑️ Сесію видалено\nСтвори нову командою /new")
 
 
 @dp.message(Command("members"))
-async def cmd_members(message: Message):
-    auto_add_participant(message)
+async def members(message: Message):
+    if not repo.has_session(message.chat.id):
+        await message.answer("❌ Спочатку створи сесію: /new")
+        return
+
     users = repo.get_participants(message.chat.id)
-
-    if not users:
-        await message.answer("Поки що нікого немає.")
-        return
-
-    text = "Учасники:\n" + "\n".join(f"- {u}" for u in users)
-    await message.answer(text)
-
-
-@dp.message(Command("reset"))
-async def cmd_reset(message: Message):
-    repo.reset(message.chat.id)
-    auto_add_participant(message)
-    await message.answer("Готово. Все стерла, починаємо з нуля ✅")
-
-
-@dp.message(Command("balance"))
-async def cmd_balance(message: Message):
-    expenses = repo.list_expenses(message.chat.id)
-
-    if not expenses:
-        await message.answer("Ще немає витрат. Напиши щось типу: `-450 піца`", parse_mode="Markdown")
-        return
-
-    balance: dict[str, float] = {}
-
-    for e in expenses:
-        payer = e["payer"]
-        amount = e["amount"]
-        parts = e["participants"]
-
-        balance[payer] = balance.get(payer, 0) + amount
-
-        split = amount / len(parts)
-        for p in parts:
-            balance[p] = balance.get(p, 0) - split
-
-    text = "Баланс:\n"
-    for u, v in sorted(balance.items()):
-        text += f"{u}: {v:.2f} грн\n"
-
-    await message.answer(text)
-
-# --------------------
-# expense handler
-# --------------------
-
-@dp.message(F.text.startswith("-"))
-async def handle_expense(message: Message):
-    auto_add_participant(message)
-
-    author = username_from_message(message)
-    if not author:
-        await message.answer("У тебе немає username 😕")
-        return
-
-    participants = repo.get_participants(message.chat.id)
-
-    try:
-        expense = parse_message(
-            text=message.text,
-            author_username=author,
-            session_participants=set(participants),
-        )
-    except ParseError as e:
-        await message.answer(str(e))
-        return
-
-    for u in expense["participants"]:
-        repo.add_participant(message.chat.id, u)
-
-    repo.add_expense(
-        chat_id=message.chat.id,
-        payer=expense["payer"],
-        amount=expense["amount"],
-        title=expense["title"],
-        participants=expense["participants"],
-    )
-
-    await message.answer(
-        "Записала ✅\n"
-        f"{expense['payer']} — {expense['amount']:.2f} грн\n"
-        f"{expense['title']}\n"
-        "Учасники: " + ", ".join(expense["participants"])
-    )
+    await message.answer("Учасники:\n" + "\n".join(f"- {u}" for u in users))
 
 
 @dp.message(Command("calculate"))
-async def calculate_transfers(message: Message):
-    session = repo.load_session(message.chat.id)
-
-    if not session or not session.expenses:
-        await message.answer("Немає витрат.")
+async def calculate(message: Message):
+    if not repo.has_session(message.chat.id):
+        await message.answer("❌ Немає активної сесії")
         return
 
+    session = repo.load_session(message.chat.id)
     transfers = session.calculate_transfers()
 
     if not transfers:
@@ -172,34 +94,63 @@ async def calculate_transfers(message: Message):
         return
 
     text = "💸 Хто кому скидає:\n"
-    for debtor, creditor, amount in transfers:
-        text += f"{debtor} → {creditor}: {amount:.2f} грн\n"
+    for d, c, a in transfers:
+        text += f"{d} → {c}: {a:.2f} грн\n"
 
     await message.answer(text)
 
-# --------------------
-# fallback
-# --------------------
 
-@dp.message()
-async def unknown(message: Message):
-    auto_add_participant(message)
-    await message.answer(
-        "Не зрозуміла 🤔\n"
-        "Спробуй:\n"
-        "`-450 піца`\n"
-        "`-120 таксі @ivan`",
-        parse_mode="Markdown"
+# ---------- expenses ----------
+
+@dp.message(F.text.startswith("-"))
+async def expense(message: Message):
+    if not repo.has_session(message.chat.id):
+        await message.answer("❌ Сесія не створена\nСтвори її: /new")
+        return
+
+    author = username(message)
+    if not author:
+        await message.answer("❌ У тебе немає username")
+        return
+
+    session_users = repo.get_participants(message.chat.id)
+
+    try:
+        data = parse_message(
+            message.text,
+            author,
+            session_users,
+        )
+    except ParseError as e:
+        await message.answer(str(e))
+        return
+
+    for u in data["participants"]:
+        if u not in session_users:
+            await message.answer(f"❌ {u} не входить до цієї сесії")
+            return
+
+    repo.add_expense(
+        message.chat.id,
+        data["payer"],
+        data["amount"],
+        data["title"],
+        data["participants"],
     )
 
-# --------------------
-# run
-# --------------------
+    await message.answer(
+        "Записала ✅\n"
+        f"{data['payer']} — {data['amount']:.2f} грн\n"
+        f"{data['title']}\n"
+        f"Учасники: {', '.join(data['participants'])}"
+    )
+
+
+# ---------- run ----------
 
 async def main():
-    me = await bot.get_me()
-    print(f"I AM: {me.username} {me.id}")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
