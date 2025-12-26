@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
+from app.domain.errors import SessionError, SessionErrorCode
+
 
 @dataclass(frozen=True)
 class Expense:
@@ -22,14 +24,14 @@ class Session:
     def add_expense(self, expense: Expense) -> None:
 
         if expense.payer not in self.participants:
-            raise ValueError(f"Payer '{expense.payer}' not in session participants")
+            raise SessionError(SessionErrorCode.PAYER_NOT_IN_SESSION)
 
         for u in expense.participants:
             if u not in self.participants:
-                raise ValueError(f"Participant '{u}' not in session participants")
+                raise SessionError(SessionErrorCode.PARTICIPANT_NOT_IN_SESSION)
 
         if expense.amount_cents <= 0:
-            raise ValueError("Amount must be > 0")
+            raise SessionError(SessionErrorCode.AMOUNT_MUST_BE_POSITIVE)
 
         self.expenses.append(expense)
 

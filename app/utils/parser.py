@@ -2,10 +2,7 @@ import re
 from typing import Iterable
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-
-class ParseError(Exception):
-    pass
-
+from app.domain.errors import ParseError, ParseErrorCode
 
 _amount_re = re.compile(r"""
     ^\s*-\s*                          # starts with '-' (expense)
@@ -23,10 +20,10 @@ def _to_cents(raw_num: str) -> int:
     try:
         dec = Decimal(raw_num)
     except InvalidOperation:
-        raise ParseError("Invalid format")
+        raise ParseError(ParseErrorCode.INVALID_AMOUNT)
 
     if dec <= 0:
-        raise ParseError("Invalid format")
+        raise ParseError(ParseErrorCode.INVALID_AMOUNT)
 
     return int((dec * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
@@ -48,18 +45,18 @@ def parse_message(
       - Упоминания участников только с '@'
     """
     if not text or not text.lstrip().startswith("-"):
-        raise ParseError("Invalid format")
+        raise ParseError(ParseErrorCode.INVALID_FORMAT)
 
     m = _amount_re.match(text)
     if not m:
-        raise ParseError("Invalid format")
+        raise ParseError(ParseErrorCode.INVALID_AMOUNT)
 
     raw_num = m.group("num")
     amount_cents = _to_cents(raw_num)
 
     rest = text[m.end():].strip()
     if not rest:
-        raise ParseError("Invalid format")
+        raise ParseError(ParseErrorCode.INVALID_AMOUNT)
 
     tokens = rest.split()
 
@@ -80,7 +77,7 @@ def parse_message(
 
     title = " ".join(title_parts).strip()
     if not title:
-        raise ParseError("Invalid format")
+        raise ParseError(ParseErrorCode.NO_TITLE)
 
     session_participants = list(session_participants)
 
@@ -104,7 +101,7 @@ def parse_message(
 
     for u in participants_unique:
         if u not in session_participants:
-            raise ParseError("Not all people included in session")
+            raise ParseError(ParseErrorCode.UNKNOWN_PEOPLE)
 
     return {
         "amount_cents": amount_cents,

@@ -5,13 +5,10 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.db import SQLiteRepo
-from app.utils.tg import username_from_message
+from app.routers.common import username_from_message
+from app.texts import MSG, default_session_name
 
 router = Router()
-
-
-def default_session_name() -> str:
-    return datetime.now().strftime("Сесія %d.%m %H:%M")
 
 
 def parse_new_args(text: str) -> tuple[str | None, list[str]]:
@@ -41,10 +38,13 @@ async def cmd_new(message: Message, repo: SQLiteRepo):
         repo.add_participant(sid, u)
 
     users = repo.list_participants(sid)
+    users_text = "\n".join(f"• {u}" for u in users) if users else MSG.EMPTY_DASH
+
     await message.answer(
-        "✅ Сесію створено\n"
-        f"Назва: {name}\n"
-        "Учасники:\n" + ("\n".join(f"• {u}" for u in users) if users else "—")
+        f"{MSG.SESSION_CREATED}\n"
+        + MSG.SESSION_CREATED_NAME.format(name=name)
+        + "\n"
+        + MSG.SESSION_CREATED_USERS.format(users=users_text)
     )
 
 
@@ -52,8 +52,8 @@ async def cmd_new(message: Message, repo: SQLiteRepo):
 async def cmd_delete(message: Message, repo: SQLiteRepo):
     session = repo.load_session(message.chat.id)
     if not session:
-        await message.answer("❗ Немає активної сесії")
+        await message.answer(MSG.NO_ACTIVE_SESSION)
         return
 
     repo.delete_chat_session(message.chat.id)
-    await message.answer("🗑️ Сесію видалено. Почни нову через /new")
+    await message.answer(MSG.SESSION_DELETED)

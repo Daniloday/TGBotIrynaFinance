@@ -3,68 +3,60 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.db import SQLiteRepo
+from app.texts import MSG
+from app.routers.common import require_session
 
 router = Router()
 
 
-def get_session(message: Message, repo: SQLiteRepo):
-    session = repo.load_session(message.chat.id)
-    if not session:
-        return None
-    return session
-
-
 @router.message(Command("members"))
 async def cmd_members(message: Message, repo: SQLiteRepo):
-    session = get_session(message, repo)
+    session = await require_session(message, repo)
     if not session:
-        await message.answer("❗ Сесію не створено. Використай /new")
         return
 
     users = session.participants
     if not users:
-        await message.answer("Поки що немає учасників. Додай через /add @username")
+        await message.answer(MSG.MEMBERS_EMPTY_ADD)
         return
 
-    await message.answer("Учасники:\n" + "\n".join(f"• {u}" for u in users))
+    await message.answer(MSG.MEMBERS_TITLE.format(users="\n".join(f"• {u}" for u in users)))
 
 
 @router.message(Command("add"))
 async def cmd_add(message: Message, repo: SQLiteRepo):
-    session = get_session(message, repo)
+    session = await require_session(message, repo)
     if not session:
-        await message.answer("❗ Спочатку створи сесію через /new")
         return
 
     parts = (message.text or "").split()
     mentions = [p.strip() for p in parts[1:] if p.startswith("@") and len(p) > 1]
 
     if not mentions:
-        await message.answer("Формат: /add @username @username2")
+        await message.answer(MSG.ADD_FORMAT)
         return
 
     for u in mentions:
         repo.add_participant(session.sid, u)
 
-    await message.answer("✅ Додала: " + ", ".join(mentions))
+    await message.answer(MSG.ADDED_USERS.format(users=", ".join(mentions)))
 
 
 @router.message(Command("remove"))
 async def cmd_remove(message: Message, repo: SQLiteRepo):
-    session = get_session(message, repo)
+    session = await require_session(message, repo)
     if not session:
-        await message.answer("❗ Спочатку створи сесію через /new")
         return
 
     parts = (message.text or "").split()
     if len(parts) < 2:
-        await message.answer("Формат: /remove @username")
+        await message.answer(MSG.REMOVE_FORMAT)
         return
 
     username = parts[1].strip()
     ok = repo.remove_participant(session.sid, username)
     if not ok:
-        await message.answer("❗ Не можу видалити: цей учасник вже фігурує у витратах")
+        await message.answer(MSG.REMOVE_CANT_USED)
         return
 
-    await message.answer(f"✅ Видалила {username}")
+    await message.answer(MSG.REMOVED_USER.format(user=username))

@@ -2,27 +2,33 @@ from aiogram import Router, F
 from aiogram.types import Message
 
 from app.db import SQLiteRepo
-from app.utils.curreny import format_uah
+from app.domain.errors import ParseErrorCode
+from app.routers.common import require_session, username_from_message
+from app.texts import MSG
+from app.utils.currency import format_uah
 from app.utils.parser import parse_message, ParseError
-from app.utils.tg import username_from_message
 
 router = Router()
+
+PARSE_ERROR_TO_TEXT = {
+    ParseErrorCode.INVALID_FORMAT: MSG.PARSE_INVALID_FORMAT,
+    ParseErrorCode.INVALID_AMOUNT: MSG.PARSE_BAD_AMOUNT,
+    ParseErrorCode.NO_TITLE: MSG.PARSE_NO_TITLE,
+    ParseErrorCode.UNKNOWN_PEOPLE: MSG.PARSE_UNKNOWN_PEOPLE,
+}
 
 
 @router.message(F.text.startswith("-"))
 async def handle_expense(message: Message, repo: SQLiteRepo):
-    session = repo.load_session(message.chat.id)
+    session = await require_session(message, repo)
     if not session:
-        await message.answer("❗ Спочатку створи сесію через /new")
         return
 
-    author = username_from_message(message)
+    author = await require_username(message)
     if not author:
-        await message.answer("У тебе немає Telegram username 😕")
         return
 
-    if not session.participants:
-        await message.answer("❗ У сесії немає учасників. Додай людей через /add @username")
+    if not await require_participants(message, session):
         return
 
     try:
@@ -32,7 +38,7 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
             session_participants=session.participants,
         )
     except ParseError as e:
-        await message.answer(str(e))
+        await message.answer(PARSE_ERROR_TO_TEXT.get(e.code, MSG.PARSE_INVALID_FORMAT))
         return
 
     repo.add_expense(
@@ -44,8 +50,26 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
     )
 
     await message.answer(
-        "Записала ✅\n"
-        f"{expense['payer']} — {format_uah(expense['amount_cents'])}\n"
-        f"{expense['title']}\n"
-        "Учасники: " + ", ".join(expense["participants"])
+        f"{MSG.EXPENSE_SAVED}\n"
+        + MSG.EXPENSE_SAVED_DETAILS.format(
+            payer=expense["payer"],
+            amount=format_uah(expense["amount_cents"]),
+            title=expense["title"],
+            participants=", ".join(expense["participants"]),
+        )
     )
+
+
+async def require_username(message: Message) -> str | None:
+    u = username_from_message(message)
+    if not u:
+        await message.answer(MSG.NO_USERNAME)
+        return None
+    return u
+
+
+async def require_participants(message: Message, session) -> bool:
+    if not session.participants:
+        await message.answer(MSG.NO_PARTICIPANTS)
+        return False
+    return True
