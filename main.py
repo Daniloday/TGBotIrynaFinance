@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from app.db import SQLiteRepo
 from app.parser import parse_message, ParseError
 
+from datetime import datetime
+
 # --------------------
 # bootstrap
 # --------------------
@@ -54,6 +56,20 @@ def format_uah(cents: int) -> str:
     return f"{sign}{cents // 100}.{cents % 100:02d} грн"
 
 
+def default_session_name() -> str:
+    now = datetime.now()
+    return now.strftime("Сесія %d.%m %H:%M")
+
+
+def parse_new_args(text: str) -> tuple[str | None, list[str]]:
+    parts = text.split()
+    tokens = parts[1:]
+    mentions = [t for t in tokens if t.startswith("@") and len(t) > 1]
+    name_tokens = [t for t in tokens if not (t.startswith("@") and len(t) > 1)]
+    name = " ".join(name_tokens).strip() or None
+    return name, mentions
+
+
 # --------------------
 # commands
 # --------------------
@@ -61,17 +77,25 @@ def format_uah(cents: int) -> str:
 @dp.message(Command("new"))
 async def cmd_new(message: Message):
     repo.delete_chat_session(message.chat.id)
-    #TODO parse session name or create + parse users from message
-    sid = repo.create_session(message.chat.id, "Test")
 
-    u = username_from_message(message)
+    name, mentions = parse_new_args(message.text or "/new")
+    if not name:
+        name = default_session_name()
 
-    if u:
+    sid = repo.create_session(message.chat.id, name)
+
+    author = username_from_message(message)
+    if author:
+        repo.add_participant(sid, author)
+
+    for u in mentions:
         repo.add_participant(sid, u)
 
+    users = repo.list_participants(sid)
     await message.answer(
         "✅ Сесію створено\n"
-        f"Учасники:\n• {u}"
+        f"Назва: {name}\n"
+        "Учасники:\n" + ("\n".join(f"• {u}" for u in users) if users else "—")
     )
 
 
@@ -172,20 +196,17 @@ async def cmd_add(message: Message):
         await message.answer("❗ Спочатку створи сесію через /new")
         return
 
-    if not message.text:
-        return
-    parts = message.text.split()
-    if len(parts) < 2:
-        await message.answer("Формат: /add @username")
+    parts = (message.text or "").split()
+    mentions = [p.strip() for p in parts[1:] if p.startswith("@") and len(p) > 1]
+
+    if not mentions:
+        await message.answer("Формат: /add @username @username2")
         return
 
-    username = parts[1].strip()
-    if not username.startswith("@"):
-        await message.answer("Тільки через @. Формат: /add @username")
-        return
+    for u in mentions:
+        repo.add_participant(session.sid, u)
 
-    repo.add_participant(session.sid, username)
-    await message.answer(f"✅ Додала {username}")
+    await message.answer("✅ Додала: " + ", ".join(mentions))
 
 
 @dp.message(Command("remove"))
@@ -203,8 +224,22 @@ async def cmd_remove(message: Message):
         return
 
     username = parts[1].strip()
-    repo.remove_participant(session.sid, username)
+    ok = repo.remove_participant(session.sid, username)
+    if not ok:
+        await message.answer("❗ Не можу видалити: цей учасник вже фігурує у витратах")
+        return
     await message.answer(f"✅ Видалила {username}")
+
+
+@dp.message(Command("delete"))
+async def cmd_delete(message: Message):
+    session = repo.load_session(message.chat.id)
+    if not session:
+        await message.answer("❗ Немає активної сесії")
+        return
+
+    repo.delete_chat_session(message.chat.id)
+    await message.answer("🗑️ Сесію видалено. Почни нову через /new")
 
 
 async def main():

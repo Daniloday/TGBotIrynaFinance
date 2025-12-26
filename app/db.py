@@ -90,12 +90,36 @@ class SQLiteRepo:
                 (session_id, username),
             )
 
-    def remove_participant(self, session_id: int, username: str):
+    def can_remove_participant(self, session_id: int, username: str) -> bool:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM expenses WHERE session_id=? AND payer=? LIMIT 1",
+            (session_id, username),
+        )
+        if cur.fetchone():
+            return False
+
+        cur.execute(
+            """
+            SELECT 1
+            FROM expense_participants ep
+            JOIN expenses e ON e.id = ep.expense_id
+            WHERE e.session_id=? AND ep.username=?
+            LIMIT 1
+            """,
+            (session_id, username),
+        )
+        return cur.fetchone() is None
+
+    def remove_participant(self, session_id: int, username: str) -> bool:
+        if not self.can_remove_participant(session_id, username):
+            return False
         with self.conn:
             self.conn.execute(
                 "DELETE FROM participants WHERE session_id=? AND username=?",
                 (session_id, username),
             )
+        return True
 
     def list_participants(self, session_id: int) -> List[str]:
         cur = self.conn.cursor()

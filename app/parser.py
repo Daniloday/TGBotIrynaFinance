@@ -13,11 +13,9 @@ _amount_re = re.compile(r"""
     (?:\s+|$)                         # space or end
 """, re.VERBOSE)
 
-_mention_re = re.compile(r"^@[A-Za-z0-9_]{4,32}$")  # tg username rules (rough)
-
 
 def _is_mention(token: str) -> bool:
-    return bool(_mention_re.match(token))
+    return token.startswith("@") and len(token) > 1 and " " not in token
 
 
 def _to_cents(raw_num: str) -> int:
