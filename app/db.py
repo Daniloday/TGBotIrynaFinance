@@ -164,6 +164,53 @@ class SQLiteRepo:
             cur.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
             return cur.rowcount > 0
 
+    def list_expenses(
+            self,
+            session_id: int,
+            limit: int,
+            offset: int,
+    ) -> list[dict]:
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT id, payer, amount, title, created_at
+            FROM expenses
+            WHERE session_id=?
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (session_id, limit, offset),
+        )
+        rows = cur.fetchall()
+
+        expenses = []
+        for r in rows:
+            cur.execute(
+                "SELECT username FROM expense_participants WHERE expense_id=?",
+                (r["id"],),
+            )
+            parts = [x["username"] for x in cur.fetchall()]
+            expenses.append(
+                {
+                    "id": r["id"],
+                    "payer": r["payer"],
+                    "amount_cents": r["amount"],
+                    "title": r["title"],
+                    "participants": parts,
+                    "created_at": r["created_at"],
+                }
+            )
+
+        return expenses
+
+    def count_expenses(self, session_id: int) -> int:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) as cnt FROM expenses WHERE session_id=?",
+            (session_id,),
+        )
+        return cur.fetchone()["cnt"]
+
     def load_session(self, chat_id: int) -> Session | None:
         cur = self.conn.cursor()
 

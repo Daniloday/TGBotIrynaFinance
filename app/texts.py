@@ -67,6 +67,19 @@ class MSG:
     EXPENSE_DELETE_ERROR = "Не знайдено або вже видалено"
     EXPENSE_DELETE_BAD_DATA = "Хибні дані"
 
+    # History
+    HISTORY_TITLE = "🧾 Історія витрат (стор. {page}/{pages})"
+    HISTORY_EMPTY = "Ще немає витрат"
+    HISTORY_ITEM = (
+        "{idx}) {time} · {payer}\n"
+        "{title}\n"
+        "{amount}\n"
+        "Учасники: {participants}"
+    )
+
+    HISTORY_PREV = "⬅️"
+    HISTORY_NEXT = "➡️"
+
 
 def default_session_name() -> str:
     return datetime.now().strftime("Сесія %d.%m %H:%M")
