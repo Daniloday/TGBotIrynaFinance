@@ -1,5 +1,6 @@
 import re
 from typing import Iterable
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 
 class ParseError(Exception):
@@ -17,6 +18,19 @@ _mention_re = re.compile(r"^@[A-Za-z0-9_]{4,32}$")  # tg username rules (rough)
 
 def _is_mention(token: str) -> bool:
     return bool(_mention_re.match(token))
+
+
+def _to_cents(raw_num: str) -> int:
+    raw_num = raw_num.replace(",", ".")
+    try:
+        dec = Decimal(raw_num)
+    except InvalidOperation:
+        raise ParseError("Invalid format")
+
+    if dec <= 0:
+        raise ParseError("Invalid format")
+
+    return int((dec * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def parse_message(
@@ -42,14 +56,8 @@ def parse_message(
     if not m:
         raise ParseError("Invalid format")
 
-    raw_num = m.group("num").replace(",", ".")
-    try:
-        amount = float(raw_num)
-    except ValueError:
-        raise ParseError("Invalid format")
-
-    if amount <= 0:
-        raise ParseError("Invalid format")
+    raw_num = m.group("num")
+    amount_cents = _to_cents(raw_num)
 
     rest = text[m.end():].strip()
     if not rest:
@@ -101,7 +109,7 @@ def parse_message(
             raise ParseError("Not all people included in session")
 
     return {
-        "amount": amount,
+        "amount_cents": amount_cents,
         "title": title,
         "payer": payer,
         "participants": participants_unique,

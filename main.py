@@ -48,6 +48,12 @@ def get_session(message: Message):
     return session
 
 
+def format_uah(cents: int) -> str:
+    sign = "-" if cents < 0 else ""
+    cents = abs(cents)
+    return f"{sign}{cents // 100}.{cents % 100:02d} грн"
+
+
 # --------------------
 # commands
 # --------------------
@@ -87,10 +93,10 @@ async def cmd_balance(message: Message):
         await message.answer("Ще немає витрат")
         return
 
-    net = session.net_balances()
+    net = session.net_balances_cents()
     text = "Баланс:\n"
     for u, v in net.items():
-        text += f"{u}: {v:.2f} грн\n"
+        text += f"{u}: {format_uah(v)}\n"
 
     await message.answer(text)
 
@@ -110,7 +116,7 @@ async def cmd_calculate(message: Message):
 
     text = "💸 Хто кому скидає:\n"
     for d, c, a in transfers:
-        text += f"{d} → {c}: {a:.2f} грн\n"
+        text += f"{d} → {c}: {format_uah(a)}\n"
 
     await message.answer(text)
 
@@ -118,7 +124,7 @@ async def cmd_calculate(message: Message):
 # --------------------
 # expense handler
 # --------------------
-@dp.message(F.text)
+
 @dp.message(F.text.startswith("-"))
 async def handle_expense(message: Message):
     session = get_session(message)
@@ -146,14 +152,14 @@ async def handle_expense(message: Message):
     repo.add_expense(
         session_id=session.sid,
         payer=expense["payer"],
-        amount=expense["amount"],
+        amount_cents=expense["amount_cents"],
         title=expense["title"],
         participants=expense["participants"],
     )
 
     await message.answer(
         "Записала ✅\n"
-        f"{expense['payer']} — {expense['amount']:.2f} грн\n"
+        f"{expense['payer']} — {format_uah(expense['amount_cents'])}\n"
         f"{expense['title']}\n"
         "Учасники: " + ", ".join(expense["participants"])
     )

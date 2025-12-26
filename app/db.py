@@ -39,7 +39,7 @@ class SQLiteRepo:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id INTEGER,
             payer TEXT,
-            amount REAL,
+            amount INTEGER,
             title TEXT,
             created_at INTEGER,
             FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
@@ -89,7 +89,6 @@ class SQLiteRepo:
                 "INSERT OR IGNORE INTO participants (session_id, username) VALUES (?, ?)",
                 (session_id, username),
             )
-            self.conn.commit()
 
     def remove_participant(self, session_id: int, username: str):
         with self.conn:
@@ -97,7 +96,6 @@ class SQLiteRepo:
                 "DELETE FROM participants WHERE session_id=? AND username=?",
                 (session_id, username),
             )
-            self.conn.commit()
 
     def list_participants(self, session_id: int) -> List[str]:
         cur = self.conn.cursor()
@@ -109,15 +107,22 @@ class SQLiteRepo:
 
     # ---------- expenses ----------
 
-    def add_expense(self, session_id: int, payer: str, amount: float, title: str, participants: List[str]):
+    def add_expense(
+            self,
+            session_id: int,
+            payer: str,
+            amount_cents: int,
+            title: str,
+            participants: List[str],
+    ):
         with self.conn:
             cur = self.conn.cursor()
             cur.execute(
                 """
-                INSERT INTO expenses (session_id, payer, amount, title, created_at)
+                INSERT OR IGNORE INTO expenses (session_id, payer, amount, title, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (session_id, payer, amount, title, int(time.time())),
+                (session_id, payer, amount_cents, title, int(time.time())),
             )
             eid = cur.lastrowid
 
@@ -126,7 +131,6 @@ class SQLiteRepo:
                     "INSERT INTO expense_participants (expense_id, username) VALUES (?, ?)",
                     (eid, u),
                 )
-            self.conn.commit()
 
     def load_session(self, chat_id: int) -> Session | None:
         cur = self.conn.cursor()
@@ -161,7 +165,7 @@ class SQLiteRepo:
 
             session.add_expense(
                 Expense(
-                    amount=e["amount"],
+                    amount_cents=e["amount"],
                     payer=e["payer"],
                     participants=p,
                     description=e["title"],
