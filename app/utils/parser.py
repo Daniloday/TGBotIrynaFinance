@@ -92,6 +92,9 @@ def parse_message(
     if payer not in participants:
         participants = [payer] + participants
 
+    if author_username not in participants:
+        participants = [author_username] + participants
+
     seen = set()
     participants_unique = []
     for p in participants:
