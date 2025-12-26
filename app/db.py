@@ -2,7 +2,7 @@ import sqlite3
 import time
 import os
 from typing import List
-from app.session import Session, Expense
+from app.services.session import Session, Expense
 
 
 class SQLiteRepo:
@@ -143,7 +143,7 @@ class SQLiteRepo:
             cur = self.conn.cursor()
             cur.execute(
                 """
-                INSERT OR IGNORE INTO expenses (session_id, payer, amount, title, created_at)
+                INSERT INTO expenses (session_id, payer, amount, title, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (session_id, payer, amount_cents, title, int(time.time())),

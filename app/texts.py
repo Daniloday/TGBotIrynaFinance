@@ -11,7 +11,6 @@ START_TEXT = (
     "Команди:\n"
     "/members — учасники\n"
     "/balance — хто кому винен\n"
-    "/reset — скинути все\n"
 )
 
 NO_USERNAME = "У тебе немає Telegram username. Додай його в налаштуваннях."
