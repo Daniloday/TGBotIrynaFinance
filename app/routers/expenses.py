@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 from app.db import SQLiteRepo
 from app.domain.errors import ParseErrorCode
@@ -41,7 +41,7 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
         await message.answer(PARSE_ERROR_TO_TEXT.get(e.code, MSG.PARSE_INVALID_FORMAT))
         return
 
-    repo.add_expense(
+    eid = repo.add_expense(
         session_id=session.sid,
         payer=expense["payer"],
         amount_cents=expense["amount_cents"],
@@ -56,7 +56,8 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
             amount=format_uah(expense["amount_cents"]),
             title=expense["title"],
             participants=", ".join(expense["participants"]),
-        )
+        ),
+        reply_markup=kb_delete_expense(eid),
     )
 
 
@@ -73,3 +74,31 @@ async def require_participants(message: Message, session) -> bool:
         await message.answer(MSG.NO_PARTICIPANTS)
         return False
     return True
+
+
+def kb_delete_expense(eid: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=MSG.EXPENSE_DELETE_BTN, callback_data=f"del_exp:{eid}")]
+        ]
+    )
+
+
+@router.callback_query(F.data.startswith("del_exp:"))
+async def cb_delete_expense(cb: CallbackQuery, repo: SQLiteRepo):
+    try:
+        eid = int((cb.data or "").split(":", 1)[1])
+    except Exception:
+        await cb.answer(MSG.EXPENSE_DELETE_BAD_DATA, show_alert=True)
+        return
+
+    ok = repo.delete_expense(eid)
+    if not ok:
+        await cb.answer(MSG.EXPENSE_DELETE_ERROR, show_alert=True)
+        return
+
+    if cb.message:
+        await cb.message.edit_text(MSG.EXPENSE_DELETED)
+
+    await cb.answer()
+

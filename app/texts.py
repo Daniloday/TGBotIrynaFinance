@@ -62,6 +62,11 @@ class MSG:
     TRANSFERS_TITLE = "💸 Хто кому скидає:\n{lines}"
     TRANSFERS_NONE = "Ніхто нікому не винен ✅"
 
+    EXPENSE_DELETED = "🗑️ Трату видалено ✅"
+    EXPENSE_DELETE_BTN = "🗑️ Видалити трату"
+    EXPENSE_DELETE_ERROR = "Не знайдено або вже видалено"
+    EXPENSE_DELETE_BAD_DATA = "Хибні дані"
+
 
 def default_session_name() -> str:
     return datetime.now().strftime("Сесія %d.%m %H:%M")

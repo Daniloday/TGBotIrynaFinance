@@ -156,6 +156,14 @@ class SQLiteRepo:
                     (eid, u),
                 )
 
+        return eid
+
+    def delete_expense(self, expense_id: int) -> bool:
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
+            return cur.rowcount > 0
+
     def load_session(self, chat_id: int) -> Session | None:
         cur = self.conn.cursor()
 
