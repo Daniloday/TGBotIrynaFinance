@@ -41,7 +41,7 @@ def username_from_message(message: Message) -> str | None:
     return None
 
 
-def get_session_or_reply(message: Message):
+def get_session(message: Message):
     session = repo.load_session(message.chat.id)
     if not session or not session.participants:
         return None
@@ -54,28 +54,35 @@ def get_session_or_reply(message: Message):
 
 @dp.message(Command("new"))
 async def cmd_new(message: Message):
-    repo.reset(message.chat.id)
+    repo.delete_chat_session(message.chat.id)
+    #TODO parse session name or create + parse users from message
+    sid = repo.create_session(message.chat.id, "Test")
+
+    u = username_from_message(message)
+
+    if u:
+        repo.add_participant(sid, u)
 
     await message.answer(
         "✅ Сесію створено\n"
-        f"Учасники:\n• {username_from_message(message)}"
+        f"Учасники:\n• {u}"
     )
 
 
 @dp.message(Command("members"))
 async def cmd_members(message: Message):
-    session = get_session_or_reply(message)
+    session = get_session(message)
     if not session:
         await message.answer("❗ Сесію не створено. Використай /new")
         return
 
-    users = repo.get_participants(message.chat.id)
+    users = session.participants
     await message.answer("Учасники:\n" + "\n".join(f"• {u}" for u in users))
 
 
 @dp.message(Command("balance"))
 async def cmd_balance(message: Message):
-    session = get_session_or_reply(message)
+    session = get_session(message)
     if not session or not session.expenses:
         await message.answer("Ще немає витрат")
         return
@@ -90,7 +97,7 @@ async def cmd_balance(message: Message):
 
 @dp.message(Command("calculate"))
 async def cmd_calculate(message: Message):
-    session = get_session_or_reply(message)
+    session = get_session(message)
     if not session or not session.expenses:
         await message.answer("Ще немає витрат")
         return
@@ -111,10 +118,10 @@ async def cmd_calculate(message: Message):
 # --------------------
 # expense handler
 # --------------------
-
+@dp.message(F.text)
 @dp.message(F.text.startswith("-"))
 async def handle_expense(message: Message):
-    session = get_session_or_reply(message)
+    session = get_session(message)
     if not session:
         await message.answer("❗ Спочатку створи сесію через /new")
         return
@@ -124,7 +131,7 @@ async def handle_expense(message: Message):
         await message.answer("У тебе немає Telegram username 😕")
         return
 
-    participants = repo.get_participants(message.chat.id)
+    participants = session.participants
 
     try:
         expense = parse_message(
@@ -136,11 +143,8 @@ async def handle_expense(message: Message):
         await message.answer(str(e))
         return
 
-    for u in expense["participants"]:
-        repo.add_participant(message.chat.id, u)
-
     repo.add_expense(
-        chat_id=message.chat.id,
+        session_id=session.sid,
         payer=expense["payer"],
         amount=expense["amount"],
         title=expense["title"],
@@ -155,28 +159,49 @@ async def handle_expense(message: Message):
     )
 
 
-# --------------------
-# fallback
-# --------------------
+@dp.message(Command("add"))
+async def cmd_add(message: Message):
+    session = get_session(message)
+    if not session:
+        await message.answer("❗ Спочатку створи сесію через /new")
+        return
 
-@dp.message()
-async def unknown(message: Message):
-    await message.answer(
-        "Не зрозуміла 🤔\n"
-        "Спробуй:\n"
-        "`/new`\n"
-        "`-450 піца`",
-        parse_mode="Markdown"
-    )
+    if not message.text:
+        return
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Формат: /add @username")
+        return
+
+    username = parts[1].strip()
+    if not username.startswith("@"):
+        await message.answer("Тільки через @. Формат: /add @username")
+        return
+
+    repo.add_participant(session.sid, username)
+    await message.answer(f"✅ Додала {username}")
 
 
-# --------------------
-# run
-# --------------------
+@dp.message(Command("remove"))
+async def cmd_remove(message: Message):
+    session = get_session(message)
+    if not session:
+        await message.answer("❗ Спочатку створи сесію через /new")
+        return
+
+    if not message.text:
+        return
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Формат: /remove @username")
+        return
+
+    username = parts[1].strip()
+    repo.remove_participant(session.sid, username)
+    await message.answer(f"✅ Видалила {username}")
+
 
 async def main():
-    me = await bot.get_me()
-    print(f"I AM: {me.username} {me.id}")
     await dp.start_polling(bot)
 
 

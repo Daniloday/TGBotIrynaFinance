@@ -1,6 +1,7 @@
 import sqlite3
 import time
 import os
+from typing import List
 from app.session import Session, Expense
 
 
@@ -9,168 +10,163 @@ class SQLiteRepo:
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("PRAGMA journal_mode = WAL")
 
     def init(self):
         c = self.conn.cursor()
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
-            chat_id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            name TEXT,
             created_at INTEGER
         )
         """)
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS participants (
-            chat_id INTEGER,
+            session_id INTEGER,
             username TEXT,
-            UNIQUE(chat_id, username)
+            UNIQUE(session_id, username),
+            FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
         )
         """)
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id INTEGER,
-            amount REAL,
+            session_id INTEGER,
             payer TEXT,
+            amount REAL,
             title TEXT,
-            created_at INTEGER
+            created_at INTEGER,
+            FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
         )
         """)
 
         c.execute("""
         CREATE TABLE IF NOT EXISTS expense_participants (
             expense_id INTEGER,
-            username TEXT
+            username TEXT,
+            UNIQUE(expense_id, username),
+            FOREIGN KEY(expense_id) REFERENCES expenses(id) ON DELETE CASCADE
         )
         """)
 
+        c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_chat_created ON sessions(chat_id, created_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_expenses_session_created ON expenses(session_id, created_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_exp_participants_expense ON expense_participants(expense_id)")
+
         self.conn.commit()
 
-    # ---------- session helpers ----------
+    # ---------- sessions ----------
 
-    def ensure_session(self, chat_id: int):
-        c = self.conn.cursor()
-        c.execute("INSERT OR IGNORE INTO sessions (chat_id, created_at) VALUES (?, ?)", (chat_id, int(time.time())))
+    def create_session(self, chat_id: int, name: str) -> int:
+
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO sessions (chat_id, name, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (chat_id, name, int(time.time())),
+        )
         self.conn.commit()
+        return cur.lastrowid
 
-    def has_session(self, chat_id: int) -> bool:
-        c = self.conn.cursor()
-        c.execute("SELECT chat_id FROM sessions WHERE chat_id = ?", (chat_id,))
-        return c.fetchone() is not None
+    def delete_chat_session(self, chat_id: int):
+        self.conn.execute("DELETE FROM sessions WHERE chat_id=?", (chat_id,))
+        self.conn.commit()
 
     # ---------- participants ----------
 
-    def add_participant(self, chat_id: int, username: str):
-        self.ensure_session(chat_id)
-        c = self.conn.cursor()
-        c.execute(
-            "INSERT OR IGNORE INTO participants (chat_id, username) VALUES (?, ?)",
-            (chat_id, username),
-        )
-        self.conn.commit()
+    def add_participant(self, session_id: int, username: str):
+        with self.conn:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO participants (session_id, username) VALUES (?, ?)",
+                (session_id, username),
+            )
+            self.conn.commit()
 
-    def get_participants(self, chat_id: int) -> list[str]:
-        c = self.conn.cursor()
-        c.execute(
-            "SELECT username FROM participants WHERE chat_id = ? ORDER BY username",
-            (chat_id,),
+    def remove_participant(self, session_id: int, username: str):
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM participants WHERE session_id=? AND username=?",
+                (session_id, username),
+            )
+            self.conn.commit()
+
+    def list_participants(self, session_id: int) -> List[str]:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT username FROM participants WHERE session_id=? ORDER BY username",
+            (session_id,),
         )
-        return [r["username"] for r in c.fetchall()]
+        return [r["username"] for r in cur.fetchall()]
 
     # ---------- expenses ----------
 
-    def add_expense(self, chat_id: int, payer: str, amount: float, title: str, participants: list[str]):
-        self.ensure_session(chat_id)
-        c = self.conn.cursor()
-        c.execute(
-            """
-            INSERT INTO expenses (chat_id, amount, payer, title, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (chat_id, amount, payer, title, int(time.time())),
-        )
-        expense_id = c.lastrowid
-
-        for u in participants:
-            c.execute(
-                "INSERT INTO expense_participants (expense_id, username) VALUES (?, ?)",
-                (expense_id, u),
+    def add_expense(self, session_id: int, payer: str, amount: float, title: str, participants: List[str]):
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO expenses (session_id, payer, amount, title, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (session_id, payer, amount, title, int(time.time())),
             )
+            eid = cur.lastrowid
 
-        self.conn.commit()
+            for u in participants:
+                cur.execute(
+                    "INSERT INTO expense_participants (expense_id, username) VALUES (?, ?)",
+                    (eid, u),
+                )
+            self.conn.commit()
 
-    def list_expenses(self, chat_id: int):
-        c = self.conn.cursor()
-        c.execute(
-            "SELECT * FROM expenses WHERE chat_id = ? ORDER BY created_at",
+    def load_session(self, chat_id: int) -> Session | None:
+        cur = self.conn.cursor()
+
+        cur.execute(
+            "SELECT id, name FROM sessions WHERE chat_id=? ORDER BY created_at DESC LIMIT 1",
             (chat_id,),
         )
-        expenses = c.fetchall()
+        s = cur.fetchone()
+        if not s:
+            return None
 
-        result = []
+        session_id = s["id"]
+        name = s["name"] or str(session_id)
+
+        parts = self.list_participants(session_id)
+
+        session = Session(sid=session_id, name=name, participants=parts)
+
+        cur.execute(
+            "SELECT * FROM expenses WHERE session_id=? ORDER BY created_at",
+            (session_id,),
+        )
+        expenses = cur.fetchall()
+
         for e in expenses:
-            c.execute(
-                "SELECT username FROM expense_participants WHERE expense_id = ?",
+            cur.execute(
+                "SELECT username FROM expense_participants WHERE expense_id=?",
                 (e["id"],),
             )
-            parts = [r["username"] for r in c.fetchall()]
-
-            result.append(
-                {
-                    "payer": e["payer"],
-                    "amount": e["amount"],
-                    "title": e["title"],
-                    "participants": parts,
-                    "created_at": e["created_at"],
-                }
-            )
-        return result
-
-    # ---------- delete / reset ----------
-
-    def delete_session(self, chat_id: int):
-        c = self.conn.cursor()
-
-        c.execute("SELECT id FROM expenses WHERE chat_id = ?", (chat_id,))
-        ids = [r["id"] for r in c.fetchall()]
-
-        for eid in ids:
-            c.execute("DELETE FROM expense_participants WHERE expense_id = ?", (eid,))
-
-        c.execute("DELETE FROM expenses WHERE chat_id = ?", (chat_id,))
-        c.execute("DELETE FROM participants WHERE chat_id = ?", (chat_id,))
-        c.execute("DELETE FROM sessions WHERE chat_id = ?", (chat_id,))
-
-        self.conn.commit()
-
-    # алиас для совместимости с любыми версиями main.py
-    def reset(self, chat_id: int):
-        self.delete_session(chat_id)
-
-    # ---------- session object ----------
-
-    def load_session(self, chat_id: int) -> Session:
-        participants = self.get_participants(chat_id)
-
-        session = Session(
-            name=str(chat_id),
-            participants=participants,
-        )
-
-        expenses = self.list_expenses(chat_id)
-        for e in expenses:
-            # ensure_users чтобы не падало если вдруг кто-то левый в expenses
-            session.ensure_users([e["payer"], *e["participants"]])
+            p = [r["username"] for r in cur.fetchall()]
 
             session.add_expense(
                 Expense(
                     amount=e["amount"],
                     payer=e["payer"],
-                    participants=e["participants"],
+                    participants=p,
                     description=e["title"],
                 )
             )
 
         return session
+

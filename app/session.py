@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
+EPS = 0.00001
 
 @dataclass(frozen=True)
 class Expense:
@@ -13,15 +14,15 @@ class Expense:
 
 
 class Session:
-    def __init__(self, name: str, participants: List[str]):
+    def __init__(self, sid: int, name: str, participants: List[str]):
+        self.sid = sid
         self.name = name
-        self.participants = list(dict.fromkeys(participants))  # unique, keep order
+        self.participants = list(dict.fromkeys(participants))
         self.expenses: List[Expense] = []
 
     def add_expense(self, expense: Expense) -> None:
-        # Мини-валидация чтобы не ловить сюрпризы
+
         if expense.payer not in self.participants:
-            # Если плательщика нет в сессии - это ошибка концепта
             raise ValueError(f"Payer '{expense.payer}' not in session participants")
 
         for u in expense.participants:
@@ -32,12 +33,6 @@ class Session:
             raise ValueError("Amount must be > 0")
 
         self.expenses.append(expense)
-
-    def totals_paid(self) -> Dict[str, float]:
-        paid = {u: 0.0 for u in self.participants}
-        for e in self.expenses:
-            paid[e.payer] += e.amount
-        return paid
 
     def net_balances(self) -> Dict[str, float]:
         """
@@ -53,7 +48,6 @@ class Session:
             for u in e.participants:
                 net[u] -= share
 
-        # округлим для стабильности
         for u in net:
             net[u] = round(net[u], 2)
 
@@ -68,7 +62,6 @@ class Session:
         creditors = [(u, net[u]) for u in net if net[u] > 0.0]
         debtors = [(u, -net[u]) for u in net if net[u] < 0.0]
 
-        # сортируем: кто больше должен/кто больше получает
         creditors.sort(key=lambda x: x[1], reverse=True)
         debtors.sort(key=lambda x: x[1], reverse=True)
 
@@ -81,7 +74,7 @@ class Session:
             creditor, credit = creditors[j]
 
             x = round(min(debt, credit), 2)
-            if x > 0:
+            if x >= 0.01:
                 transfers.append((debtor, creditor, x))
 
             debt -= x
@@ -90,15 +83,10 @@ class Session:
             debtors[i] = (debtor, round(debt, 2))
             creditors[j] = (creditor, round(credit, 2))
 
-            if debtors[i][1] == 0:
+            if debtors[i][1] <= EPS:
                 i += 1
-            if creditors[j][1] == 0:
+            if creditors[j][1] <= EPS:
                 j += 1
 
         return transfers
-
-    def ensure_users(self, users: List[str]) -> None:
-        for u in users:
-            if u not in self.participants:
-                self.participants.append(u)
 
