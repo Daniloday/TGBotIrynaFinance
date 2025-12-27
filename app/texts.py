@@ -80,6 +80,10 @@ class MSG:
     HISTORY_PREV = "⬅️"
     HISTORY_NEXT = "➡️"
 
+    HISTORY_DAY_TODAY = "📅 Сьогодні"
+    HISTORY_DAY_YESTERDAY = "📅 Вчора"
+    HISTORY_DAY_DATE = "📅 {date}"
+
 
 def default_session_name() -> str:
     return datetime.now().strftime("Сесія %d.%m %H:%M")

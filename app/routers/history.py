@@ -3,7 +3,7 @@ from app.texts import MSG
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 from app.db import SQLiteRepo
 from app.texts import MSG
@@ -18,6 +18,15 @@ PAGE_SIZE = 5
 @router.message(Command("history"))
 async def cmd_history(message: Message, repo: SQLiteRepo):
     await render_history(message, repo, page=1)
+
+
+def fmt_day_label(ts: int, today: date) -> str:
+    d = datetime.fromtimestamp(ts).date()
+    if d == today:
+        return MSG.HISTORY_DAY_TODAY
+    if d == today - timedelta(days=1):
+        return MSG.HISTORY_DAY_YESTERDAY
+    return MSG.HISTORY_DAY_DATE.format(date=d.strftime("%d.%m.%Y"))
 
 
 async def render_history(
@@ -46,7 +55,16 @@ async def render_history(
 
     lines = [MSG.HISTORY_TITLE.format(page=page, pages=pages), ""]
 
+    today = datetime.now().date()
+    last_day = None
+
     for i, e in enumerate(expenses, start=offset + 1):
+        day = datetime.fromtimestamp(e["created_at"]).date()
+        if day != last_day:
+            lines.append(fmt_day_label(e["created_at"], today))
+            lines.append("")
+            last_day = day
+
         lines.append(
             MSG.HISTORY_ITEM.format(
                 idx=i,
@@ -57,7 +75,7 @@ async def render_history(
                 participants=", ".join(e["participants"]),
             )
         )
-        lines.append("")  # пустая строка
+        lines.append("")
 
     text = "\n".join(lines).strip()
 
