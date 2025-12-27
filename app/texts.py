@@ -89,6 +89,28 @@ class MSG:
         "Додай ще когось через /add @username"
     )
 
+    SESSION_DELETE_CONFIRM_TITLE = (
+        "⚠️ Ти точно хочеш видалити сесію?\n"
+        "Всі дані цієї сесії будуть втрачені назавжди."
+    )
+    SESSION_DELETE_CONFIRM_NAME = "Сесія: {name}"
+    SESSION_DELETE_BTN_YES = "✅ Так, видалити"
+    SESSION_DELETE_BTN_NO = "❌ Скасувати"
+    SESSION_DELETE_CANCELED = "Ок, не видаляю 👍"
+
+    SESSION_DELETE_BAD_DATA = "❗ Хибні дані"
+    SESSION_DELETE_NOT_ACTUAL = "ℹ️ Ця сесія вже неактуальна"
+
+    SESSION_NEW_CONFIRM_TITLE = (
+        "⚠️ Створити нову сесію?\n"
+        "Всі дані поточної сесії будуть втрачені."
+    )
+    SESSION_NEW_CONFIRM_NAME = "Поточна сесія: {name}"
+    SESSION_NEW_BTN_YES = "✅ Так, створити нову"
+    SESSION_NEW_BTN_NO = "❌ Скасувати"
+    SESSION_NEW_CANCELED = "Ок, залишаємо поточну сесію 👍"
+
+
 
 def default_session_name() -> str:
     return datetime.now().strftime("Сесія %d.%m %H:%M")
