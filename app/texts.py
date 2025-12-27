@@ -84,6 +84,11 @@ class MSG:
     HISTORY_DAY_YESTERDAY = "📅 Вчора"
     HISTORY_DAY_DATE = "📅 {date}"
 
+    EXPENSE_NEED_TWO_PARTICIPANTS = (
+        "❗ Для додавання витрати потрібно мінімум 2 учасники.\n"
+        "Додай ще когось через /add @username"
+    )
+
 
 def default_session_name() -> str:
     return datetime.now().strftime("Сесія %d.%m %H:%M")

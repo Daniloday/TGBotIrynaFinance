@@ -24,6 +24,10 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
     if not session:
         return
 
+    if len(session.participants) < 2:
+        await message.answer(MSG.EXPENSE_NEED_TWO_PARTICIPANTS)
+        return
+
     author = await require_username(message)
     if not author:
         return
