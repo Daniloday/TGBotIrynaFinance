@@ -35,6 +35,7 @@ START_TEXT = (
     "/add @user1 @user2 — додати людей\n"
     "/remove @username — видалити людину\n"
     "/check — розрахувати\n"
+    "/history — історія витрат\n"
     "/members — учасники\n"
     "/balance — баланс\n"
 )
