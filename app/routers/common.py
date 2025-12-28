@@ -1,8 +1,3 @@
-from aiogram.types import Message
-
-from app.db import SQLiteRepo
-from app.texts import MSG
-
 from typing import Union
 from aiogram.types import Message, CallbackQuery
 

@@ -1,5 +1,4 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from app.texts import MSG
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
@@ -17,7 +16,7 @@ PAGE_SIZE = 5
 
 @router.message(Command("history"))
 async def cmd_history(message: Message, repo: SQLiteRepo):
-    await render_history(message, repo, page=1)
+    await render_history(message, repo, page=1, prefix="hist:", back_cb=None)
 
 
 def fmt_day_label(ts: int, today: date) -> str:
@@ -30,9 +29,11 @@ def fmt_day_label(ts: int, today: date) -> str:
 
 
 async def render_history(
-        message: Message | CallbackQuery,
-        repo: SQLiteRepo,
-        page: int,
+    message: Message | CallbackQuery,
+    repo: SQLiteRepo,
+    page: int,
+    prefix: str = "hist:",
+    back_cb: str | None = None,
 ):
     session = await require_session(message, repo)
     if not session:
@@ -78,8 +79,7 @@ async def render_history(
         lines.append("")
 
     text = "\n".join(lines).strip()
-
-    kb = history_nav_kb(page, pages)
+    kb = history_nav_kb(page, pages, prefix=prefix, back_cb=back_cb)
 
     if isinstance(message, CallbackQuery):
         await message.message.edit_text(text, reply_markup=kb)
@@ -92,29 +92,29 @@ def fmt_time(ts: int) -> str:
     return datetime.fromtimestamp(ts).strftime("%H:%M")
 
 
-def history_nav_kb(page: int, pages: int) -> InlineKeyboardMarkup | None:
-    buttons = []
+def history_nav_kb(
+    page: int,
+    pages: int,
+    prefix: str = "hist:",
+    back_cb: str | None = None,
+) -> InlineKeyboardMarkup | None:
+    rows: list[list[InlineKeyboardButton]] = []
 
+    nav: list[InlineKeyboardButton] = []
     if page > 1:
-        buttons.append(
-            InlineKeyboardButton(
-                text=MSG.HISTORY_PREV,
-                callback_data=f"hist:{page - 1}",
-            )
-        )
-
+        nav.append(InlineKeyboardButton(text=MSG.HISTORY_PREV, callback_data=f"{prefix}{page - 1}"))
     if page < pages:
-        buttons.append(
-            InlineKeyboardButton(
-                text=MSG.HISTORY_NEXT,
-                callback_data=f"hist:{page + 1}",
-            )
-        )
+        nav.append(InlineKeyboardButton(text=MSG.HISTORY_NEXT, callback_data=f"{prefix}{page + 1}"))
+    if nav:
+        rows.append(nav)
 
-    if not buttons:
+    if back_cb:
+        rows.append([InlineKeyboardButton(text=MSG.BTN_BACK, callback_data=back_cb)])
+
+    if not rows:
         return None
 
-    return InlineKeyboardMarkup(inline_keyboard=[buttons])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 @router.callback_query(F.data.startswith("hist:"))
@@ -124,5 +124,14 @@ async def cb_history(cb: CallbackQuery, repo: SQLiteRepo):
     except Exception:
         await cb.answer()
         return
+    await render_history(cb, repo, page, prefix="hist:", back_cb=None)
 
-    await render_history(cb, repo, page)
+
+@router.callback_query(F.data.startswith("histc:"))
+async def cb_history_from_check(cb: CallbackQuery, repo: SQLiteRepo):
+    try:
+        page = int(cb.data.split(":", 1)[1])
+    except Exception:
+        await cb.answer()
+        return
+    await render_history(cb, repo, page, prefix="histc:", back_cb="nav:back_check")

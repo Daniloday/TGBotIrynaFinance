@@ -110,6 +110,10 @@ class MSG:
     SESSION_NEW_BTN_NO = "❌ Скасувати"
     SESSION_NEW_CANCELED = "Ок, залишаємо поточну сесію 👍"
 
+    CHECK_BTN_HISTORY = "🧾 Історія"
+    CHECK_BTN_DETAILS = "📊 Деталі"
+    BTN_BACK = "↩️ Назад"
+    BTN_CALCULATE = "💸 Розрахувати"
 
 
 def default_session_name() -> str:
