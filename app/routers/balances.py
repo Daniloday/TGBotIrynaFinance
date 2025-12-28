@@ -42,7 +42,7 @@ async def render_check(message: Message | CallbackQuery, repo: SQLiteRepo):
     if not session:
         return
     if not session.expenses:
-        await message.answer(MSG.NO_EXPENSES_YET)
+        await message.answer(MSG.NO_EXPENSES)
         return
 
     transfers = session.calculate_transfers()
@@ -65,7 +65,7 @@ async def render_balance_plain(message: Message | CallbackQuery, repo: SQLiteRep
     if not session:
         return
     if not session.expenses:
-        await message.answer(MSG.NO_EXPENSES_YET)
+        await message.answer(MSG.NO_EXPENSES)
         return
 
     text = build_balance_text(session)
@@ -104,7 +104,7 @@ async def render_balance_from_check(cb: CallbackQuery, repo: SQLiteRepo):
     if not session:
         return
     if not session.expenses:
-        await cb.message.edit_text(MSG.NO_EXPENSES_YET, reply_markup=back_kb())
+        await cb.message.edit_text(MSG.NO_EXPENSES, reply_markup=back_kb())
         await cb.answer()
         return
 

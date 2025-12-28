@@ -175,7 +175,7 @@ async def cb_new_no(cb: CallbackQuery):
 async def cmd_delete(message: Message, repo: SQLiteRepo):
     session = repo.load_session(message.chat.id)
     if not session:
-        await message.answer(MSG.NO_ACTIVE_SESSION)
+        await message.answer(MSG.NO_SESSION)
         return
 
     text = (

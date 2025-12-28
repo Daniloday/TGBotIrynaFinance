@@ -72,7 +72,7 @@ async def cmd_remove(message: Message, repo: SQLiteRepo):
         await message.answer(MSG.REMOVE_NOT_FOUND.format(user=username))
         return
     if status == "used":
-        await message.answer(MSG.REMOVE_CANT_USED)
+        await message.answer(MSG.CANT_REMOVE_USED)
         return
 
     await message.answer(MSG.REMOVED_USER.format(user=username))

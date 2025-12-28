@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from app.config import get_settings
 from app.db import SQLiteRepo
-from app.routers import sessions, members, expenses, balances, history
+from app.routers import sessions, members, expenses, balances, history, start
 
 
 async def main():
@@ -24,6 +24,7 @@ async def main():
     dp.include_router(expenses.router)
     dp.include_router(balances.router)
     dp.include_router(history.router)
+    dp.include_router(start.router)
 
     await dp.start_polling(bot)
 
