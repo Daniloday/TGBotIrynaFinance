@@ -115,6 +115,16 @@ class MSG:
     BTN_BACK = "↩️ Назад"
     BTN_CALCULATE = "💸 Розрахувати"
 
+    BALANCE_BLOCK_TITLE = "Баланс:\n{lines}"
+    BALANCE_PAID_TITLE = "Хто скільки платив:\n{lines}"
+    BALANCE_SPENT_TITLE = "Хто скільки витратив:\n{lines}"
+
+    BALANCE_FULL = (
+        "{balance}\n\n"
+        "{paid}\n\n"
+        "{spent}"
+    )
+
 
 def default_session_name() -> str:
     return datetime.now().strftime("Сесія %d.%m %H:%M")

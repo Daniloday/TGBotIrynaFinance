@@ -68,9 +68,7 @@ async def render_balance_plain(message: Message | CallbackQuery, repo: SQLiteRep
         await message.answer(MSG.NO_EXPENSES_YET)
         return
 
-    net = session.net_balances_cents()
-    lines = "".join(f"{u}: {format_uah(v)}\n" for u, v in net.items())
-    text = MSG.BALANCE_TITLE.format(lines=lines.rstrip())
+    text = build_balance_text(session)
 
     # В обычном /balance: только кнопка "Розрахувати"
     if isinstance(message, CallbackQuery):
@@ -78,6 +76,27 @@ async def render_balance_plain(message: Message | CallbackQuery, repo: SQLiteRep
         await message.answer()
     else:
         await message.answer(text, reply_markup=balance_kb())
+
+def _fmt_lines_amount(d: dict[str, int]) -> str:
+    # можно сортировать как хочешь, я бы по убыванию суммы:
+    items = sorted(d.items(), key=lambda x: x[1], reverse=True)
+    return "".join(f"{u}: {format_uah(v)}\n" for u, v in items).rstrip()
+
+
+def build_balance_text(session) -> str:
+    net = session.net_balances_cents()
+    paid = session.totals_paid_cents()
+    spent = session.totals_spent_cents()
+
+    balance_block = MSG.BALANCE_BLOCK_TITLE.format(lines=_fmt_lines_amount(net))
+    paid_block = MSG.BALANCE_PAID_TITLE.format(lines=_fmt_lines_amount(paid))
+    spent_block = MSG.BALANCE_SPENT_TITLE.format(lines=_fmt_lines_amount(spent))
+
+    return MSG.BALANCE_FULL.format(
+        balance=balance_block,
+        paid=paid_block,
+        spent=spent_block,
+    )
 
 
 async def render_balance_from_check(cb: CallbackQuery, repo: SQLiteRepo):
@@ -89,9 +108,7 @@ async def render_balance_from_check(cb: CallbackQuery, repo: SQLiteRepo):
         await cb.answer()
         return
 
-    net = session.net_balances_cents()
-    lines = "".join(f"{u}: {format_uah(v)}\n" for u, v in net.items())
-    text = MSG.BALANCE_TITLE.format(lines=lines.rstrip())
+    text = build_balance_text(session)
 
     await cb.message.edit_text(text, reply_markup=back_kb())
     await cb.answer()

@@ -21,6 +21,23 @@ class Session:
         self.participants = list(dict.fromkeys(participants))
         self.expenses: List[Expense] = []
 
+    def totals_paid_cents(self) -> Dict[str, int]:
+        paid = {u: 0 for u in self.participants}
+        for e in self.expenses:
+            paid[e.payer] += e.amount_cents
+        return paid
+
+    def totals_spent_cents(self) -> Dict[str, int]:
+        spent = {u: 0 for u in self.participants}
+        for e in self.expenses:
+            n = len(e.participants)
+            base = e.amount_cents // n
+            rem = e.amount_cents % n
+            for i, u in enumerate(e.participants):
+                share = base + (1 if i < rem else 0)
+                spent[u] += share
+        return spent
+
     def add_expense(self, expense: Expense) -> None:
 
         if expense.payer not in self.participants:
