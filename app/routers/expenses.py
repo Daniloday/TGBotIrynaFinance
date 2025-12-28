@@ -1,3 +1,5 @@
+import re
+
 from aiogram import Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
@@ -17,9 +19,16 @@ PARSE_ERROR_TO_TEXT = {
     ParseErrorCode.UNKNOWN_PEOPLE: MSG.PARSE_UNKNOWN_PEOPLE,
 }
 
+_ONLY_AMOUNT_RE = re.compile(r"^-\d+(?:[.,]\d{1,2})?$")
+
 
 @router.message(F.text.startswith("-"))
 async def handle_expense(message: Message, repo: SQLiteRepo):
+    text = (message.text or "").strip()
+
+    if _ONLY_AMOUNT_RE.fullmatch(text):
+        return
+
     session = await require_session(message, repo)
     if not session:
         return
@@ -105,4 +114,3 @@ async def cb_delete_expense(cb: CallbackQuery, repo: SQLiteRepo):
         await cb.message.edit_text(MSG.EXPENSE_DELETED)
 
     await cb.answer()
-
