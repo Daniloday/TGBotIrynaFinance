@@ -40,9 +40,8 @@ class MSG:
     PARSE_BAD_AMOUNT = "Сума має бути > 0 і з максимум 2 знаками після коми."
 
     EXPENSE_SAVED_DETAILS = (
-        "{payer} — {amount}\n"
-        "{title}\n"
-        "Учасники: {participants}"
+        "\n{title}\n{payer} — {amount}\n\n"
+        "Учасники витрати:\n{participants}"
     )
 
     SESSION_CREATED_NAME = "Назва: {name}"
@@ -51,7 +50,7 @@ class MSG:
 
     NO_ACTIVE_SESSION = "❗ Немає активної сесії"
 
-    MEMBERS_TITLE = "Учасники:\n{users}"
+    MEMBERS_TITLE = "{name}\n\nУчасники:\n{users}"
     MEMBERS_EMPTY_ADD = "Поки що немає учасників. Додай через /add @username"
     ADDED_USERS = "✅ Додала: {users}"
     REMOVE_CANT_USED = "❗ Не можу видалити: цей учасник вже фігурує у витратах"
@@ -59,7 +58,7 @@ class MSG:
 
     NO_EXPENSES_YET = "Ще немає витрат"
     BALANCE_TITLE = "Баланс:\n{lines}"
-    TRANSFERS_TITLE = "💸 Хто кому скидає:\n{lines}"
+    TRANSFERS_TITLE = "{name}\n\n💸 Хто кому скидає:\n{lines}"
     TRANSFERS_NONE = "Ніхто нікому не винен ✅"
 
     EXPENSE_DELETED = "🗑️ Трату видалено ✅"
@@ -105,7 +104,7 @@ class MSG:
         "⚠️ Створити нову сесію?\n"
         "Всі дані поточної сесії будуть втрачені."
     )
-    SESSION_NEW_CONFIRM_NAME = "Поточна сесія: {name}"
+    SESSION_NEW_CONFIRM_NAME = "Поточна: {name}"
     SESSION_NEW_BTN_YES = "✅ Так, створити нову"
     SESSION_NEW_BTN_NO = "❌ Скасувати"
     SESSION_NEW_CANCELED = "Ок, залишаємо поточну сесію 👍"
@@ -120,7 +119,9 @@ class MSG:
     BALANCE_SPENT_TITLE = "Хто скільки витратив:\n{lines}"
 
     BALANCE_FULL = (
+        "{name}\n\n"
         "{balance}\n\n"
+        "____________________________________\n\n"
         "{paid}\n\n"
         "{spent}"
     )

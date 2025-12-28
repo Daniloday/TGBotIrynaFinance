@@ -62,13 +62,15 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
         participants=expense["participants"],
     )
 
+    participants_text = "\n".join(f"• {u}" for u in expense["participants"]) if expense["participants"] else MSG.EMPTY_DASH
+
     await message.answer(
         f"{MSG.EXPENSE_SAVED}\n"
         + MSG.EXPENSE_SAVED_DETAILS.format(
             payer=expense["payer"],
             amount=format_uah(expense["amount_cents"]),
             title=expense["title"],
-            participants=", ".join(expense["participants"]),
+            participants=participants_text,
         ),
         reply_markup=kb_delete_expense(eid),
     )

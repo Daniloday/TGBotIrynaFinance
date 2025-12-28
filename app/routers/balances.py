@@ -51,7 +51,7 @@ async def render_check(message: Message | CallbackQuery, repo: SQLiteRepo):
         text = MSG.TRANSFERS_NONE
     else:
         lines = "".join(f"{d} → {c}: {format_uah(a)}\n" for d, c, a in transfers)
-        text = MSG.TRANSFERS_TITLE.format(lines=lines.rstrip())
+        text = MSG.TRANSFERS_TITLE.format(name=session.name, lines=lines.rstrip())
 
     if isinstance(message, CallbackQuery):
         await message.message.edit_text(text, reply_markup=check_kb())
@@ -92,6 +92,7 @@ def build_balance_text(session) -> str:
     spent_block = MSG.BALANCE_SPENT_TITLE.format(lines=_fmt_lines_amount(spent))
 
     return MSG.BALANCE_FULL.format(
+        name=session.name,
         balance=balance_block,
         paid=paid_block,
         spent=spent_block,

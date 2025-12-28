@@ -20,7 +20,7 @@ async def cmd_members(message: Message, repo: SQLiteRepo):
         await message.answer(MSG.MEMBERS_EMPTY_ADD)
         return
 
-    await message.answer(MSG.MEMBERS_TITLE.format(users="\n".join(f"• {u}" for u in users)))
+    await message.answer(MSG.MEMBERS_TITLE.format(name=session.name, users="\n".join(f"• {u}" for u in users)))
 
 
 @router.message(Command("add"))
