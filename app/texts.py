@@ -36,7 +36,7 @@ class MSG:
     # Parse errors
     PARSE_INVALID_FORMAT = "Невірний формат. Приклад: -450 піца або -120,67 таксі"
     PARSE_NO_TITLE = "Без опису витрати не приймаю."
-    PARSE_UNKNOWN_PEOPLE = "Є люди, яких немає в учасниках сесії. Додай їх через /add"
+    PARSE_UNKNOWN_PEOPLE = "Є люди, яких немає в учасниках сесії. Додай їх через /add @username"
     PARSE_BAD_AMOUNT = "Сума має бути > 0 і з максимум 2 знаками після коми."
 
     EXPENSE_SAVED_DETAILS = (
@@ -124,6 +124,9 @@ class MSG:
         "{paid}\n\n"
         "{spent}"
     )
+
+    ALREADY_USERS = "ℹ️ Вже є в сесії: {users}"
+    REMOVE_NOT_FOUND = "ℹ️ {user} і так немає в сесії"
 
 
 def default_session_name() -> str:

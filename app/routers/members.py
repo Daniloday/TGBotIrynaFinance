@@ -36,10 +36,22 @@ async def cmd_add(message: Message, repo: SQLiteRepo):
         await message.answer(MSG.ADD_FORMAT)
         return
 
-    for u in mentions:
-        repo.add_participant(session.sid, u)
+    added: list[str] = []
+    already: list[str] = []
 
-    await message.answer(MSG.ADDED_USERS.format(users=", ".join(mentions)))
+    for u in mentions:
+        if repo.add_participant(session.sid, u):
+            added.append(u)
+        else:
+            already.append(u)
+
+    lines = []
+    if added:
+        lines.append(MSG.ADDED_USERS.format(users=", ".join(added)))
+    if already:
+        lines.append(MSG.ALREADY_USERS.format(users=", ".join(already)))
+
+    await message.answer("\n".join(lines))
 
 
 @router.message(Command("remove"))
@@ -54,8 +66,12 @@ async def cmd_remove(message: Message, repo: SQLiteRepo):
         return
 
     username = parts[1].strip()
-    ok = repo.remove_participant(session.sid, username)
-    if not ok:
+
+    status = repo.remove_participant(session.sid, username)
+    if status == "not_found":
+        await message.answer(MSG.REMOVE_NOT_FOUND.format(user=username))
+        return
+    if status == "used":
         await message.answer(MSG.REMOVE_CANT_USED)
         return
 

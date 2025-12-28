@@ -1,8 +1,10 @@
 import sqlite3
 import time
 import os
-from typing import List
 from app.services.session import Session, Expense
+from typing import List, Literal, Tuple
+
+RemoveStatus = Literal["removed", "not_found", "used"]
 
 
 class SQLiteRepo:
@@ -83,12 +85,21 @@ class SQLiteRepo:
 
     # ---------- participants ----------
 
+    def participant_exists(self, session_id: int, username: str) -> bool:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM participants WHERE session_id=? AND username=? LIMIT 1",
+            (session_id, username),
+        )
+        return cur.fetchone() is not None
+
     def add_participant(self, session_id: int, username: str):
         with self.conn:
-            self.conn.execute(
+            cur = self.conn.execute(
                 "INSERT OR IGNORE INTO participants (session_id, username) VALUES (?, ?)",
                 (session_id, username),
             )
+            return cur.rowcount == 1
 
     def can_remove_participant(self, session_id: int, username: str) -> bool:
         cur = self.conn.cursor()
@@ -111,15 +122,19 @@ class SQLiteRepo:
         )
         return cur.fetchone() is None
 
-    def remove_participant(self, session_id: int, username: str) -> bool:
+    def remove_participant(self, session_id: int, username: str) -> RemoveStatus:
+        if not self.participant_exists(session_id, username):
+            return "not_found"
+
         if not self.can_remove_participant(session_id, username):
-            return False
+            return "used"
+
         with self.conn:
-            self.conn.execute(
+            cur = self.conn.execute(
                 "DELETE FROM participants WHERE session_id=? AND username=?",
                 (session_id, username),
             )
-        return True
+            return "removed" if cur.rowcount > 0 else "not_found"
 
     def list_participants(self, session_id: int) -> List[str]:
         cur = self.conn.cursor()
