@@ -91,9 +91,8 @@ async def cmd_new(message: Message, repo: SQLiteRepo):
     current = repo.load_session(message.chat.id)
 
     name, mentions = parse_new_args(message.text or "/new")
-    creator = username_from_message(message)  # важно: автор команды, не бот
+    creator = username_from_message(message)
 
-    # Если сессии нет - создаём сразу (без confirm), как раньше
     if not current:
         _, final_name, users = _create_new_session_db(
             repo=repo,
@@ -105,7 +104,6 @@ async def cmd_new(message: Message, repo: SQLiteRepo):
         await message.answer(build_session_created_text(final_name, users))
         return
 
-    # Если есть - спрашиваем подтверждение, сохраняя args в pending
     token = pending.create(
         action="new_session",
         chat_id=message.chat.id,
@@ -141,13 +139,11 @@ async def cb_new_yes(cb: CallbackQuery, repo: SQLiteRepo):
         await cb.answer(MSG.SESSION_DELETE_NOT_ACTUAL, show_alert=True)
         return
 
-    # Защита от "устаревшей" кнопки
     current = repo.load_session(cb.message.chat.id)
     if not current or current.sid != data.get("sid"):
         await cb.answer(MSG.SESSION_DELETE_NOT_ACTUAL, show_alert=True)
         return
 
-    # Удаляем старую и создаём новую
     repo.delete_chat_session(cb.message.chat.id)
 
     _, final_name, users = _create_new_session_db(
@@ -160,7 +156,6 @@ async def cb_new_yes(cb: CallbackQuery, repo: SQLiteRepo):
 
     created_text = build_session_created_text(final_name, users)
 
-    # ВАЖНО: редактируем confirm-сообщение, чтобы не плодить сообщения
     await cb.message.edit_text(created_text)
     await cb.answer()
 

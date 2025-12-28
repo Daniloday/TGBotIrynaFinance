@@ -70,15 +70,14 @@ async def render_balance_plain(message: Message | CallbackQuery, repo: SQLiteRep
 
     text = build_balance_text(session)
 
-    # В обычном /balance: только кнопка "Розрахувати"
     if isinstance(message, CallbackQuery):
         await message.message.edit_text(text, reply_markup=balance_kb())
         await message.answer()
     else:
         await message.answer(text, reply_markup=balance_kb())
 
+
 def _fmt_lines_amount(d: dict[str, int]) -> str:
-    # можно сортировать как хочешь, я бы по убыванию суммы:
     items = sorted(d.items(), key=lambda x: x[1], reverse=True)
     return "".join(f"{u}: {format_uah(v)}\n" for u, v in items).rstrip()
 
@@ -124,11 +123,8 @@ async def cmd_check(message: Message, repo: SQLiteRepo):
     await render_check(message, repo)
 
 
-# --- callbacks ---
-
 @router.callback_query(F.data == "nav:hist_from_check")
 async def cb_nav_hist_from_check(cb: CallbackQuery, repo: SQLiteRepo):
-    # открываем историю в check-контексте: другой prefix + back-кнопка на всех страницах
     await render_history(cb, repo, page=1, prefix="histc:", back_cb="nav:back_check")
 
 
