@@ -162,6 +162,8 @@ class MSG:
     HISTORY_DAY_YESTERDAY = "📅 Вчора"
     HISTORY_DAY_DATE = "📅 {date}"
 
+    ONLY_GROUPS = "ℹ️ Ця команда працює тільки в групі"
+
 
 def default_session_name() -> str:
     now = datetime.now(TZ)

@@ -4,13 +4,15 @@ from aiogram.types import Message
 
 from app.db import SQLiteRepo
 from app.texts import MSG
-from app.routers.common import require_session
+from app.routers.common import require_session, reject_private
 
 router = Router()
 
 
 @router.message(Command("members"))
 async def cmd_members(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     session = await require_session(message, repo)
     if not session:
         return
@@ -25,6 +27,8 @@ async def cmd_members(message: Message, repo: SQLiteRepo):
 
 @router.message(Command("add"))
 async def cmd_add(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     session = await require_session(message, repo)
     if not session:
         return
@@ -56,6 +60,8 @@ async def cmd_add(message: Message, repo: SQLiteRepo):
 
 @router.message(Command("remove"))
 async def cmd_remove(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     session = await require_session(message, repo)
     if not session:
         return

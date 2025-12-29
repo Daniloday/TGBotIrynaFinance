@@ -7,7 +7,7 @@ from datetime import datetime, date, timedelta
 from app.db import SQLiteRepo
 from app.texts import MSG
 from app.utils.currency import format_uah
-from app.routers.common import require_session
+from app.routers.common import require_session, reject_private
 from app.utils.time import date_local, TZ, fmt_time
 
 router = Router()
@@ -17,6 +17,8 @@ PAGE_SIZE = 5
 
 @router.message(Command("history"))
 async def cmd_history(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     await render_history(message, repo, page=1, prefix="hist:", back_cb=None)
 
 

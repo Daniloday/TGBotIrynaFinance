@@ -17,17 +17,22 @@ from .callbacks import (
     nav_back_check,
     nav_calc_from_balance,
 )
+from ..common import reject_private
 
 router = Router()
 
 
 @router.message(Command("balance"))
 async def cmd_balance(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     await render_balance_plain(message, repo)
 
 
 @router.message(Command("check"))
 async def cmd_check(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     await render_check(message, repo)
 
 

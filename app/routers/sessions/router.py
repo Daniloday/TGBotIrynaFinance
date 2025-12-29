@@ -3,7 +3,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 
 from app.db import SQLiteRepo
-from app.routers.common import username_from_message
+from app.routers.common import username_from_message, reject_private
 from app.state import pending
 from app.texts import MSG
 
@@ -24,6 +24,8 @@ router = Router()
 
 @router.message(Command("new"))
 async def cmd_new(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     current = repo.load_session(message.chat.id)
 
     name, mentions = parse_new_args(message.text or "/new")
@@ -103,6 +105,8 @@ async def cb_new_no(cb: CallbackQuery):
 
 @router.message(Command("delete"))
 async def cmd_delete(message: Message, repo: SQLiteRepo):
+    if await reject_private(message):
+        return
     session = repo.load_session(message.chat.id)
     if not session:
         await message.answer(MSG.NO_SESSION)

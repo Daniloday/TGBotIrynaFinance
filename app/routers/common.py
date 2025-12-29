@@ -1,4 +1,6 @@
 from typing import Union
+
+from aiogram.enums import ChatType
 from aiogram.types import Message, CallbackQuery
 
 from app.db import SQLiteRepo
@@ -39,3 +41,18 @@ async def require_session(event: Event, repo: SQLiteRepo):
 def username_from_message(message: Message) -> str | None:
     u = message.from_user.username if message.from_user else None
     return f"@{u}" if u else None
+
+
+def is_private(obj: Message | CallbackQuery) -> bool:
+    chat = obj.chat if isinstance(obj, Message) else obj.message.chat
+    return chat.type == ChatType.PRIVATE
+
+
+async def reject_private(obj: Message | CallbackQuery) -> bool:
+    if is_private(obj):
+        if isinstance(obj, CallbackQuery):
+            await obj.answer(MSG.ONLY_GROUPS, show_alert=True)
+        else:
+            await obj.answer(MSG.ONLY_GROUPS)
+        return True
+    return False
