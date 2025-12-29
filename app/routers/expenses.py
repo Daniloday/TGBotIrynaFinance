@@ -62,7 +62,8 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
         participants=expense["participants"],
     )
 
-    participants_text = "\n".join(f"• {u}" for u in expense["participants"]) if expense["participants"] else MSG.EMPTY_DASH
+    participants_text = "\n".join(f"• {u}" for u in expense["participants"]) if expense[
+        "participants"] else MSG.EMPTY_DASH
 
     await message.answer(
         f"{MSG.EXPENSE_SAVED}\n"
@@ -72,7 +73,7 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
             title=expense["title"],
             participants=participants_text,
         ),
-        reply_markup=kb_delete_expense(eid),
+        reply_markup=kb_delete_expense(session.sid, eid),
     )
 
 
@@ -91,28 +92,38 @@ async def require_participants(message: Message, session) -> bool:
     return True
 
 
-def kb_delete_expense(eid: int) -> InlineKeyboardMarkup:
+def kb_delete_expense(sid: int, eid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=MSG.EXPENSE_DELETE_BTN, callback_data=f"del_exp:{eid}")]
+            [InlineKeyboardButton(text=MSG.EXPENSE_DELETE_BTN, callback_data=f"del_exp:{sid}:{eid}")]
         ]
     )
 
 
 @router.callback_query(F.data.startswith("del_exp:"))
 async def cb_delete_expense(cb: CallbackQuery, repo: SQLiteRepo):
+    if not cb.message:
+        await cb.answer()
+        return
+
     try:
-        eid = int((cb.data or "").split(":", 1)[1])
+        _, sid_s, eid_s = (cb.data or "").split(":", 2)
+        sid = int(sid_s)
+        eid = int(eid_s)
     except Exception:
         await cb.answer(MSG.EXPENSE_DELETE_BAD_DATA, show_alert=True)
         return
 
-    ok = repo.delete_expense(eid)
+    current = repo.load_session(cb.message.chat.id)
+    if not current or current.sid != sid:
+        await cb.answer(MSG.SESSION_DELETE_NOT_ACTUAL, show_alert=True)
+        return
+
+    ok = repo.delete_expense(expense_id=eid, session_id=sid)
     if not ok:
         await cb.answer(MSG.EXPENSE_DELETE_ERROR, show_alert=True)
         return
 
-    if cb.message:
-        await cb.message.edit_text(MSG.EXPENSE_DELETED)
-
+    await cb.message.edit_text(MSG.EXPENSE_DELETED)
     await cb.answer()
+

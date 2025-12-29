@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from app.utils.time import TZ
+
 # ------------------------------------------------------------
 # Start / Help
 # ------------------------------------------------------------
@@ -162,4 +164,5 @@ class MSG:
 
 
 def default_session_name() -> str:
-    return datetime.now().strftime("Сесія %d.%m %H:%M")
+    now = datetime.now(TZ)
+    return now.strftime("Сесія %d.%m %H:%M")

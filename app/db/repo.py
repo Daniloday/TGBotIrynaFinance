@@ -1,8 +1,10 @@
+import os
 import sqlite3
 import time
-import os
+from typing import List, Literal
+
 from app.services.session import Session, Expense
-from typing import List, Literal, Tuple
+from .schema import init_schema
 
 RemoveStatus = Literal["removed", "not_found", "used"]
 
@@ -15,59 +17,12 @@ class SQLiteRepo:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
 
-    def init(self):
-        c = self.conn.cursor()
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id INTEGER,
-            name TEXT,
-            created_at INTEGER
-        )
-        """)
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS participants (
-            session_id INTEGER,
-            username TEXT,
-            UNIQUE(session_id, username),
-            FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
-        )
-        """)
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER,
-            payer TEXT,
-            amount INTEGER,
-            title TEXT,
-            created_at INTEGER,
-            FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
-        )
-        """)
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS expense_participants (
-            expense_id INTEGER,
-            username TEXT,
-            UNIQUE(expense_id, username),
-            FOREIGN KEY(expense_id) REFERENCES expenses(id) ON DELETE CASCADE
-        )
-        """)
-
-        c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_chat_created ON sessions(chat_id, created_at)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_expenses_session_created ON expenses(session_id, created_at)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_exp_participants_expense ON expense_participants(expense_id)")
-
-        self.conn.commit()
+    def init(self) -> None:
+        init_schema(self.conn)
 
     # ---------- sessions ----------
 
     def create_session(self, chat_id: int, name: str) -> int:
-
         cur = self.conn.cursor()
         cur.execute(
             """
@@ -79,9 +34,57 @@ class SQLiteRepo:
         self.conn.commit()
         return cur.lastrowid
 
-    def delete_chat_session(self, chat_id: int):
+    def delete_chat_session(self, chat_id: int) -> None:
         self.conn.execute("DELETE FROM sessions WHERE chat_id=?", (chat_id,))
         self.conn.commit()
+
+    def load_session(self, chat_id: int) -> Session | None:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT id, name FROM sessions WHERE chat_id=? ORDER BY created_at DESC LIMIT 1",
+            (chat_id,),
+        )
+        s = cur.fetchone()
+        if not s:
+            return None
+
+        session_id = s["id"]
+        name = s["name"] or str(session_id)
+        parts = self.list_participants(session_id)
+
+        session = Session(sid=session_id, name=name, participants=parts)
+
+        # (можно оптимизировать позже)
+        cur.execute(
+            "SELECT id, payer, amount_cents, title, created_at FROM expenses WHERE session_id=? ORDER BY created_at",
+            (session_id,),
+        )
+        expenses = cur.fetchall()
+
+        if not expenses:
+            return session
+
+        ids = [e["id"] for e in expenses]
+        placeholders = ",".join("?" for _ in ids)
+        cur.execute(
+            f"SELECT expense_id, username FROM expense_participants WHERE expense_id IN ({placeholders})",
+            ids,
+        )
+        parts_map: dict[int, list[str]] = {}
+        for r in cur.fetchall():
+            parts_map.setdefault(r["expense_id"], []).append(r["username"])
+
+        for e in expenses:
+            session.add_expense(
+                Expense(
+                    amount_cents=e["amount_cents"],
+                    payer=e["payer"],
+                    participants=parts_map.get(e["id"], []),
+                    description=e["title"],
+                )
+            )
+
+        return session
 
     # ---------- participants ----------
 
@@ -93,7 +96,7 @@ class SQLiteRepo:
         )
         return cur.fetchone() is not None
 
-    def add_participant(self, session_id: int, username: str):
+    def add_participant(self, session_id: int, username: str) -> bool:
         with self.conn:
             cur = self.conn.execute(
                 "INSERT OR IGNORE INTO participants (session_id, username) VALUES (?, ?)",
@@ -147,18 +150,18 @@ class SQLiteRepo:
     # ---------- expenses ----------
 
     def add_expense(
-            self,
-            session_id: int,
-            payer: str,
-            amount_cents: int,
-            title: str,
-            participants: List[str],
-    ):
+        self,
+        session_id: int,
+        payer: str,
+        amount_cents: int,
+        title: str,
+        participants: List[str],
+    ) -> int:
         with self.conn:
             cur = self.conn.cursor()
             cur.execute(
                 """
-                INSERT INTO expenses (session_id, payer, amount, title, created_at)
+                INSERT INTO expenses (session_id, payer, amount_cents, title, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (session_id, payer, amount_cents, title, int(time.time())),
@@ -173,22 +176,20 @@ class SQLiteRepo:
 
         return eid
 
-    def delete_expense(self, expense_id: int) -> bool:
+    def delete_expense(self, expense_id: int, session_id: int) -> bool:
         with self.conn:
             cur = self.conn.cursor()
-            cur.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
+            cur.execute(
+                "DELETE FROM expenses WHERE id=? AND session_id=?",
+                (expense_id, session_id),
+            )
             return cur.rowcount > 0
 
-    def list_expenses(
-            self,
-            session_id: int,
-            limit: int,
-            offset: int,
-    ) -> list[dict]:
+    def list_expenses(self, session_id: int, limit: int, offset: int) -> list[dict]:
         cur = self.conn.cursor()
         cur.execute(
             """
-            SELECT id, payer, amount, title, created_at
+            SELECT id, payer, amount_cents, title, created_at
             FROM expenses
             WHERE session_id=?
             ORDER BY created_at DESC
@@ -197,21 +198,30 @@ class SQLiteRepo:
             (session_id, limit, offset),
         )
         rows = cur.fetchall()
+        if not rows:
+            return []
 
-        expenses = []
+        ids = [r["id"] for r in rows]
+        placeholders = ",".join("?" for _ in ids)
+
+        cur.execute(
+            f"SELECT expense_id, username FROM expense_participants WHERE expense_id IN ({placeholders})",
+            ids,
+        )
+
+        parts_map: dict[int, list[str]] = {}
+        for r in cur.fetchall():
+            parts_map.setdefault(r["expense_id"], []).append(r["username"])
+
+        expenses: list[dict] = []
         for r in rows:
-            cur.execute(
-                "SELECT username FROM expense_participants WHERE expense_id=?",
-                (r["id"],),
-            )
-            parts = [x["username"] for x in cur.fetchall()]
             expenses.append(
                 {
                     "id": r["id"],
                     "payer": r["payer"],
-                    "amount_cents": r["amount"],
+                    "amount_cents": r["amount_cents"],
                     "title": r["title"],
-                    "participants": parts,
+                    "participants": parts_map.get(r["id"], []),
                     "created_at": r["created_at"],
                 }
             )
@@ -220,51 +230,5 @@ class SQLiteRepo:
 
     def count_expenses(self, session_id: int) -> int:
         cur = self.conn.cursor()
-        cur.execute(
-            "SELECT COUNT(*) as cnt FROM expenses WHERE session_id=?",
-            (session_id,),
-        )
+        cur.execute("SELECT COUNT(*) as cnt FROM expenses WHERE session_id=?", (session_id,))
         return cur.fetchone()["cnt"]
-
-    def load_session(self, chat_id: int) -> Session | None:
-        cur = self.conn.cursor()
-
-        cur.execute(
-            "SELECT id, name FROM sessions WHERE chat_id=? ORDER BY created_at DESC LIMIT 1",
-            (chat_id,),
-        )
-        s = cur.fetchone()
-        if not s:
-            return None
-
-        session_id = s["id"]
-        name = s["name"] or str(session_id)
-
-        parts = self.list_participants(session_id)
-
-        session = Session(sid=session_id, name=name, participants=parts)
-
-        cur.execute(
-            "SELECT * FROM expenses WHERE session_id=? ORDER BY created_at",
-            (session_id,),
-        )
-        expenses = cur.fetchall()
-
-        for e in expenses:
-            cur.execute(
-                "SELECT username FROM expense_participants WHERE expense_id=?",
-                (e["id"],),
-            )
-            p = [r["username"] for r in cur.fetchall()]
-
-            session.add_expense(
-                Expense(
-                    amount_cents=e["amount"],
-                    payer=e["payer"],
-                    participants=p,
-                    description=e["title"],
-                )
-            )
-
-        return session
-

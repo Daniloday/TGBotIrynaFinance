@@ -8,6 +8,7 @@ from app.db import SQLiteRepo
 from app.texts import MSG
 from app.utils.currency import format_uah
 from app.routers.common import require_session
+from app.utils.time import date_local, TZ, fmt_time
 
 router = Router()
 
@@ -20,7 +21,7 @@ async def cmd_history(message: Message, repo: SQLiteRepo):
 
 
 def fmt_day_label(ts: int, today: date) -> str:
-    d = datetime.fromtimestamp(ts).date()
+    d = date_local(ts)
     if d == today:
         return MSG.HISTORY_DAY_TODAY
     if d == today - timedelta(days=1):
@@ -56,11 +57,11 @@ async def render_history(
 
     lines = [MSG.HISTORY_TITLE.format(page=page, pages=pages), ""]
 
-    today = datetime.now().date()
+    today = datetime.now(TZ).date()
     last_day = None
 
     for i, e in enumerate(expenses, start=offset + 1):
-        day = datetime.fromtimestamp(e["created_at"]).date()
+        day = date_local(e["created_at"])
         if day != last_day:
             lines.append(fmt_day_label(e["created_at"], today))
             lines.append("")
@@ -86,10 +87,6 @@ async def render_history(
         await message.answer()
     else:
         await message.answer(text, reply_markup=kb)
-
-
-def fmt_time(ts: int) -> str:
-    return datetime.fromtimestamp(ts).strftime("%H:%M")
 
 
 def history_nav_kb(
