@@ -1,90 +1,26 @@
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import (
-    Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery,
-)
+from aiogram.types import Message, CallbackQuery
 
 from app.db import SQLiteRepo
 from app.routers.common import username_from_message
-from app.texts import MSG, default_session_name
 from app.state import pending
+from app.texts import MSG
+
+from .parse import parse_new_args
+from .render import build_session_created_text
+from .keyboards import (
+    kb_confirm_new_session,
+    kb_confirm_delete_session,
+    CB_NEW_YES,
+    CB_NEW_NO,
+    CB_DEL_SESS_YES,
+    CB_DEL_SESS_NO,
+)
+from .service import create_new_session_db
 
 router = Router()
 
-
-# -------------------------
-# Helpers
-# -------------------------
-
-def parse_new_args(text: str) -> tuple[str | None, list[str]]:
-    parts = (text or "").split()
-    tokens = parts[1:]
-    mentions = [t for t in tokens if t.startswith("@") and len(t) > 1]
-    name_tokens = [t for t in tokens if not (t.startswith("@") and len(t) > 1)]
-    name = " ".join(name_tokens).strip() or None
-    return name, mentions
-
-
-def build_session_created_text(name: str, users: list[str]) -> str:
-    users_text = "\n".join(f"• {u}" for u in users) if users else MSG.EMPTY_DASH
-    return (
-        f"{MSG.SESSION_CREATED}\n\n"
-        + MSG.SESSION_CREATED_NAME.format(name=name)
-        + "\n\n"
-        + MSG.SESSION_CREATED_USERS.format(users=users_text)
-    )
-
-
-def kb_confirm_new_session(token: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=MSG.SESSION_NEW_BTN_YES, callback_data=f"new_yes:{token}")],
-            [InlineKeyboardButton(text=MSG.SESSION_NEW_BTN_NO, callback_data=f"new_no:{token}")],
-        ]
-    )
-
-
-def kb_confirm_delete_session(sid: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=MSG.SESSION_DELETE_BTN_YES, callback_data=f"del_sess_yes:{sid}")],
-            [InlineKeyboardButton(text=MSG.SESSION_DELETE_BTN_NO, callback_data=f"del_sess_no:{sid}")],
-        ]
-    )
-
-
-def _create_new_session_db(
-    repo: SQLiteRepo,
-    chat_id: int,
-    name: str | None,
-    mentions: list[str],
-    creator: str | None,
-) -> tuple[int, str, list[str]]:
-    """
-    Создаёт сессию в БД и возвращает (sid, name, users).
-    creator - кто должен быть добавлен как участник (автор /new).
-    """
-    if not name:
-        name = default_session_name()
-
-    sid = repo.create_session(chat_id, name)
-
-    if creator:
-        repo.add_participant(sid, creator)
-
-    for u in mentions:
-        repo.add_participant(sid, u)
-
-    users = repo.list_participants(sid)
-    return sid, name, users
-
-
-# -------------------------
-# /new
-# -------------------------
 
 @router.message(Command("new"))
 async def cmd_new(message: Message, repo: SQLiteRepo):
@@ -94,7 +30,7 @@ async def cmd_new(message: Message, repo: SQLiteRepo):
     creator = username_from_message(message)
 
     if not current:
-        _, final_name, users = _create_new_session_db(
+        _, final_name, users = create_new_session_db(
             repo=repo,
             chat_id=message.chat.id,
             name=name,
@@ -122,7 +58,7 @@ async def cmd_new(message: Message, repo: SQLiteRepo):
     )
 
 
-@router.callback_query(F.data.startswith("new_yes:"))
+@router.callback_query(F.data.startswith(f"{CB_NEW_YES}:"))
 async def cb_new_yes(cb: CallbackQuery, repo: SQLiteRepo):
     if not cb.message:
         await cb.answer()
@@ -146,7 +82,7 @@ async def cb_new_yes(cb: CallbackQuery, repo: SQLiteRepo):
 
     repo.delete_chat_session(cb.message.chat.id)
 
-    _, final_name, users = _create_new_session_db(
+    _, final_name, users = create_new_session_db(
         repo=repo,
         chat_id=cb.message.chat.id,
         name=data.get("name"),
@@ -154,22 +90,16 @@ async def cb_new_yes(cb: CallbackQuery, repo: SQLiteRepo):
         creator=data.get("creator"),
     )
 
-    created_text = build_session_created_text(final_name, users)
-
-    await cb.message.edit_text(created_text)
+    await cb.message.edit_text(build_session_created_text(final_name, users))
     await cb.answer()
 
 
-@router.callback_query(F.data.startswith("new_no:"))
+@router.callback_query(F.data.startswith(f"{CB_NEW_NO}:"))
 async def cb_new_no(cb: CallbackQuery):
     if cb.message:
         await cb.message.edit_text(MSG.SESSION_NEW_CANCELED)
     await cb.answer()
 
-
-# -------------------------
-# /delete
-# -------------------------
 
 @router.message(Command("delete"))
 async def cmd_delete(message: Message, repo: SQLiteRepo):
@@ -186,7 +116,7 @@ async def cmd_delete(message: Message, repo: SQLiteRepo):
     await message.answer(text, reply_markup=kb_confirm_delete_session(session.sid))
 
 
-@router.callback_query(F.data.startswith("del_sess_yes:"))
+@router.callback_query(F.data.startswith(f"{CB_DEL_SESS_YES}:"))
 async def cb_delete_session_yes(cb: CallbackQuery, repo: SQLiteRepo):
     if not cb.message:
         await cb.answer()
@@ -209,7 +139,7 @@ async def cb_delete_session_yes(cb: CallbackQuery, repo: SQLiteRepo):
     await cb.answer()
 
 
-@router.callback_query(F.data.startswith("del_sess_no:"))
+@router.callback_query(F.data.startswith(f"{CB_DEL_SESS_NO}:"))
 async def cb_delete_session_no(cb: CallbackQuery):
     if cb.message:
         await cb.message.edit_text(MSG.SESSION_DELETE_CANCELED)

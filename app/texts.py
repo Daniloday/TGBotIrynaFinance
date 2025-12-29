@@ -49,6 +49,7 @@ HELP_TEXT = START_TEXT
 
 class MSG:
     # Common / account
+    EMPTY_DASH = ""
     NO_USERNAME = "У тебе немає Telegram username. Додай його в налаштуваннях"
     RESET_DONE = "Готово. Все стерла, починаємо з нуля ✅"
 
