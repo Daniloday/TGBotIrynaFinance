@@ -26,6 +26,9 @@ _ONLY_AMOUNT_RE = re.compile(r"^-\d+(?:[.,]\d{1,2})?$")
 async def handle_expense(message: Message, repo: SQLiteRepo):
     text = (message.text or "").strip()
 
+    if text == "-":
+        return
+
     if _ONLY_AMOUNT_RE.fullmatch(text):
         return
 
