@@ -36,10 +36,9 @@ START_TEXT = (
     "/new [назва (не обов'язкова)] @user1 @user2 — нова сесія\n"
     "/add @user1 @user2 — додати людей\n"
     "/remove @username — видалити людину\n"
-    "/check — розрахувати\n"
     "/history — історія витрат\n"
-    "/members — учасники\n"
-    "/balance — баланс\n"
+    "/members — учасники\n\n"
+    "/check — фінальний розрахунок\n"
 )
 
 HELP_TEXT = START_TEXT
@@ -133,7 +132,7 @@ class MSG:
     TRANSFERS_TITLE = "{name}\n\n💸 Хто кому скидає:\n{lines}"
     TRANSFERS_NONE = "Ніхто нікому не винен ✅"
 
-    BALANCE_BLOCK_TITLE = "Баланс:\n{lines}"
+    BALANCE_BLOCK_TITLE = "Баланс:\n(+ вам винні, - ви винні)\n{lines}"
     BALANCE_PAID_TITLE = "Хто скільки платив:\n{lines}"
     BALANCE_SPENT_TITLE = "Хто скільки витратив:\n{lines}"
 
