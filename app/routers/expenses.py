@@ -101,13 +101,75 @@ async def require_participants(message: Message, session) -> bool:
 def kb_delete_expense(sid: int, eid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=MSG.EXPENSE_DELETE_BTN, callback_data=f"del_exp:{sid}:{eid}")]
+            [
+                InlineKeyboardButton(
+                    text=MSG.EXPENSE_DELETE_BTN,
+                    callback_data=f"del_exp:{sid}:{eid}",
+                )
+            ]
+        ]
+    )
+
+
+def kb_confirm_delete_expense(sid: int, eid: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=MSG.EXPENSE_DELETE_BTN_YES,
+                    callback_data=f"del_exp_yes:{sid}:{eid}",
+                ),
+                InlineKeyboardButton(
+                    text=MSG.EXPENSE_DELETE_BTN_NO,
+                    callback_data=f"del_exp_no:{sid}:{eid}",
+                ),
+            ]
         ]
     )
 
 
 @router.callback_query(F.data.startswith("del_exp:"))
-async def cb_delete_expense(cb: CallbackQuery, repo: SQLiteRepo):
+async def cb_delete_expense_confirm(cb: CallbackQuery):
+    if not cb.message:
+        await cb.answer()
+        return
+
+    try:
+        _, sid_s, eid_s = (cb.data or "").split(":", 2)
+        sid = int(sid_s)
+        eid = int(eid_s)
+    except Exception:
+        await cb.answer(MSG.EXPENSE_DELETE_BAD_DATA, show_alert=True)
+        return
+
+    await cb.message.edit_reply_markup(
+        reply_markup=kb_confirm_delete_expense(sid, eid)
+    )
+    await cb.answer(MSG.EXPENSE_DELETE_CONFIRM_TITLE)
+
+
+@router.callback_query(F.data.startswith("del_exp_no:"))
+async def cb_delete_expense_cancel(cb: CallbackQuery):
+    if not cb.message:
+        await cb.answer()
+        return
+
+    try:
+        _, sid_s, eid_s = (cb.data or "").split(":", 2)
+        sid = int(sid_s)
+        eid = int(eid_s)
+    except Exception:
+        await cb.answer(MSG.EXPENSE_DELETE_BAD_DATA, show_alert=True)
+        return
+
+    await cb.message.edit_reply_markup(
+        reply_markup=kb_delete_expense(sid, eid)
+    )
+    await cb.answer(MSG.EXPENSE_DELETE_CANCELED)
+
+
+@router.callback_query(F.data.startswith("del_exp_yes:"))
+async def cb_delete_expense_apply(cb: CallbackQuery, repo: SQLiteRepo):
     if not cb.message:
         await cb.answer()
         return
@@ -122,7 +184,7 @@ async def cb_delete_expense(cb: CallbackQuery, repo: SQLiteRepo):
 
     current = repo.load_session(cb.message.chat.id)
     if not current or current.sid != sid:
-        await cb.answer(MSG.SESSION_DELETE_NOT_ACTUAL, show_alert=True)
+        await cb.answer(MSG.EXPENSE_DELETE_NOT_ACTUAL, show_alert=True)
         return
 
     ok = repo.delete_expense(expense_id=eid, session_id=sid)

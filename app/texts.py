@@ -123,6 +123,15 @@ class MSG:
     EXPENSE_DELETE_ERROR = "Не знайдено або вже видалено"
     EXPENSE_DELETE_BAD_DATA = "❗ Хибні дані"
 
+    EXPENSE_DELETE_CONFIRM_TITLE = (
+        "⚠️ Точно хочеш видалити цю витрату?\n"
+        "Після цього я її вже не поверну"
+    )
+    EXPENSE_DELETE_BTN_YES = "✅ Так, видалити"
+    EXPENSE_DELETE_BTN_NO = "❌ Ні, залишити"
+    EXPENSE_DELETE_CANCELED = "Ок, не видаляю 👌"
+    EXPENSE_DELETE_NOT_ACTUAL = "ℹ️ Ця сесія вже неактуальна"
+
     # Balance / Check
     CHECK_BTN_HISTORY = "🧾 Історія"
     CHECK_BTN_DETAILS = "📊 Деталі"
