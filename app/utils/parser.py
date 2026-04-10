@@ -1,5 +1,5 @@
 import re
-from typing import Iterable
+from typing import Iterable, Dict, List
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from app.domain.errors import ParseError, ParseErrorCode
@@ -32,7 +32,7 @@ def parse_message(
         text: str,
         author_username: str,
         session_participants: Iterable[str],
-) -> dict:
+) -> dict[str, str | int | list[str]] | None:
     """
     Форматы:
       -80 pizza
@@ -44,8 +44,15 @@ def parse_message(
       - Сумма хранится как ПОЛОЖИТЕЛЬНАЯ (80.0)
       - Упоминания участников только с '@'
     """
-    if not text or not text.lstrip().startswith("-"):
-        raise ParseError(ParseErrorCode.INVALID_FORMAT)
+
+    text_stripped = text.lstrip()
+
+    if not text or not text_stripped.startswith("-"):
+        raise None
+
+    rest_after_dash = text_stripped[1:].lstrip()
+    if not rest_after_dash or not rest_after_dash[0].isdigit():
+        return None
 
     m = _amount_re.match(text)
     if not m:

@@ -57,6 +57,9 @@ async def handle_expense(message: Message, repo: SQLiteRepo):
         await message.answer(PARSE_ERROR_TO_TEXT.get(e.code, MSG.PARSE_INVALID_FORMAT))
         return
 
+    if expense is None:
+        return
+
     eid = repo.add_expense(
         session_id=session.sid,
         payer=expense["payer"],
