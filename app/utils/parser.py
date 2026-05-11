@@ -1,5 +1,5 @@
 import re
-from typing import Iterable, Dict, List
+from typing import Iterable
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from app.domain.errors import ParseError, ParseErrorCode
@@ -48,7 +48,7 @@ def parse_message(
     text_stripped = text.lstrip()
 
     if not text or not text_stripped.startswith("-"):
-        raise None
+        return None
 
     rest_after_dash = text_stripped[1:].lstrip()
     if not rest_after_dash or not rest_after_dash[0].isdigit():
