@@ -30,11 +30,11 @@ app/
   config.py                  # Environment settings
   db/                        # SQLite schema and repository
   domain/                    # Domain errors
+  main.py                    # Entrypoint
   routers/                   # aiogram handlers and keyboards
   services/session.py        # Expense splitting domain logic
   state/                     # In-memory pending action state
   utils/                     # Parser, currency, timezone helpers
-  main.py                      # Entrypoint
 tests/                       # Unit tests
 data/                        # Runtime SQLite storage
 .github/workflows/prod.yml   # Production deploy workflow
@@ -57,7 +57,7 @@ Install and run:
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
-python main.py
+python -m app.main
 ```
 
 Run tests:
@@ -72,6 +72,5 @@ python -m unittest discover -s tests
 docker compose up -d --build
 docker compose logs -f bot
 ```
-
 
 

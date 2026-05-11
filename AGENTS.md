@@ -1,5 +1,5 @@
 ## Project Structure & Module Organization
-- `main.py` - bot entrypoint: loads settings, initializes SQLite, registers aiogram routers, and starts polling.
+- `app/main.py` - bot entrypoint: loads settings, initializes SQLite, registers aiogram routers, and starts polling.
 - `app/config.py` - environment loading. Required: `BOT_TOKEN`; optional: `DB_PATH` with default `data/iryna.db`.
 - `app/db/` - SQLite schema and repository.
   - `schema.py` - tables and indexes.
@@ -20,7 +20,7 @@
 2. Install the project:
    `pip install -e .`
 3. Start the bot:
-   `python main.py`
+   `python -m app.main`
 
 ## Run Tests
 - Local:

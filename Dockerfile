@@ -12,8 +12,7 @@ RUN apt-get update \
 COPY pyproject.toml ./
 COPY app ./app
 COPY tests ./tests
-COPY main.py ./
 
 RUN pip install --no-cache-dir .
 
-CMD ["python", "main.py"]
+CMD ["python", "-m", "app.main"]
