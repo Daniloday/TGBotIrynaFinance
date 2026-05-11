@@ -34,12 +34,12 @@ app/
   services/session.py        # Expense splitting domain logic
   state/                     # In-memory pending action state
   utils/                     # Parser, currency, timezone helpers
+  main.py                      # Entrypoint
 tests/                       # Unit tests
 data/                        # Runtime SQLite storage
 .github/workflows/prod.yml   # Production deploy workflow
 Dockerfile                   # Bot image
 docker-compose.yml           # VPS runtime setup
-main.py                      # Entrypoint
 ```
 
 ## Local Setup
@@ -73,28 +73,5 @@ docker compose up -d --build
 docker compose logs -f bot
 ```
 
-SQLite data is mounted from `./data` into `/app/data`.
 
-## Deployment
 
-Production deployment is handled by GitHub Actions.
-
-The workflow runs only on tags that start with `v`, for example `v1.2.0`, and verifies that the tagged commit belongs to `origin/prod`.
-
-Release flow:
-
-```bash
-git checkout prod
-git merge dev --ff-only
-git push origin prod
-
-git tag -a v1.2.0 -m "Release v1.2.0"
-git push origin v1.2.0
-```
-
-Required GitHub secrets:
-
-- `VPS_HOST`
-- `VPS_USER`
-- `VPS_SSH_KEY`
-- `VPS_DEPLOY_PATH`

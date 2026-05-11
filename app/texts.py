@@ -38,7 +38,7 @@ START_TEXT = (
     "/remove @username — видалити людину\n"
     "/history — історія витрат\n"
     "/members — учасники\n\n"
-    "/check — фінальний розрахунок\n"
+    "/check — фінальний розрахунок!\n"
 )
 
 HELP_TEXT = START_TEXT
