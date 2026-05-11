@@ -1,5 +1,7 @@
 # Iryna Finance Bot
 
+[![Telegram](https://img.shields.io/badge/Telegram-@iryna_finance_bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/iryna_finance_bot)
+
 Iryna Finance Bot is a private Telegram bot for tracking shared group expenses. It stores sessions, participants, expenses, payment history, balances, and final transfers in SQLite.
 
 ## Features
