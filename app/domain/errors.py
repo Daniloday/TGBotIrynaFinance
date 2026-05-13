@@ -17,6 +17,9 @@ class ParseError(Exception):
 class SessionErrorCode(str, Enum):
     PAYER_NOT_IN_SESSION = "payer_not_in_session"
     PARTICIPANT_NOT_IN_SESSION = "participant_not_in_session"
+    SENDER_NOT_IN_SESSION = "sender_not_in_session"
+    RECIPIENT_NOT_IN_SESSION = "recipient_not_in_session"
+    TRANSFER_TO_SELF = "transfer_to_self"
     AMOUNT_MUST_BE_POSITIVE = "amount_must_be_positive"
 
 

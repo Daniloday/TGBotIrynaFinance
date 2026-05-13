@@ -29,6 +29,19 @@ class SQLiteRepoTest(unittest.TestCase):
         self.assertEqual(session.participants, ["@a", "@b"])
         self.assertEqual(session.net_balances_cents(), {"@a": 5000, "@b": -5000})
 
+    def test_create_load_session_with_transfer(self) -> None:
+        sid = self.repo.create_session(1001, "Trip")
+        self.repo.add_participant(sid, "@a")
+        self.repo.add_participant(sid, "@b")
+        self.repo.add_expense(sid, "@a", 10000, "hotel", ["@a", "@b"])
+        self.repo.add_transfer(sid, "@b", "@a", 2000)
+
+        session = self.repo.load_session(1001)
+
+        self.assertIsNotNone(session)
+        self.assertEqual(session.net_balances_cents(), {"@a": 3000, "@b": -3000})
+        self.assertEqual(session.actual_transfers_cents(), {("@b", "@a"): 2000})
+
     def test_list_count_and_delete_expenses(self) -> None:
         sid = self.repo.create_session(1001, "Trip")
         self.repo.add_participant(sid, "@a")
@@ -39,6 +52,18 @@ class SQLiteRepoTest(unittest.TestCase):
         self.assertTrue(self.repo.delete_expense(expense_id, sid))
         self.assertEqual(self.repo.count_expenses(sid), 0)
 
+    def test_count_and_delete_transfers(self) -> None:
+        sid = self.repo.create_session(1001, "Trip")
+        self.repo.add_participant(sid, "@a")
+        self.repo.add_participant(sid, "@b")
+        transfer_id = self.repo.add_transfer(sid, "@b", "@a", 500)
+
+        self.assertEqual(self.repo.count_transfers(sid), 1)
+        self.assertEqual(self.repo.load_session(1001).net_balances_cents(), {"@a": -500, "@b": 500})
+        self.assertTrue(self.repo.delete_transfer(transfer_id, sid))
+        self.assertEqual(self.repo.count_transfers(sid), 0)
+        self.assertEqual(self.repo.load_session(1001).net_balances_cents(), {"@a": 0, "@b": 0})
+
     def test_remove_participant_statuses(self) -> None:
         sid = self.repo.create_session(1001, "Trip")
         self.repo.add_participant(sid, "@a")
@@ -48,6 +73,15 @@ class SQLiteRepoTest(unittest.TestCase):
         self.assertEqual(self.repo.remove_participant(sid, "@missing"), "not_found")
         self.assertEqual(self.repo.remove_participant(sid, "@a"), "used")
         self.assertEqual(self.repo.remove_participant(sid, "@b"), "removed")
+
+    def test_cannot_remove_participant_used_in_transfer(self) -> None:
+        sid = self.repo.create_session(1001, "Trip")
+        self.repo.add_participant(sid, "@a")
+        self.repo.add_participant(sid, "@b")
+        self.repo.add_transfer(sid, "@b", "@a", 500)
+
+        self.assertEqual(self.repo.remove_participant(sid, "@a"), "used")
+        self.assertEqual(self.repo.remove_participant(sid, "@b"), "used")
 
 
 if __name__ == "__main__":

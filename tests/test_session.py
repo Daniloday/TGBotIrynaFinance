@@ -1,7 +1,7 @@
 import unittest
 
 from app.domain.errors import SessionError, SessionErrorCode
-from app.services.session import Expense, Session
+from app.services.session import Expense, Session, Transfer
 
 
 class SessionTest(unittest.TestCase):
@@ -19,6 +19,29 @@ class SessionTest(unittest.TestCase):
         session.add_expense(Expense(9000, "@a", ["@a", "@b", "@c"], "hotel"))
 
         self.assertEqual(session.calculate_transfers(), [("@b", "@a", 3000), ("@c", "@a", 3000)])
+
+    def test_transfer_reduces_debt(self) -> None:
+        session = Session(1, "Trip", ["@a", "@b"])
+        session.add_expense(Expense(10000, "@a", ["@a", "@b"], "hotel"))
+        session.add_transfer(Transfer(2000, "@b", "@a"))
+
+        self.assertEqual(session.net_balances_cents(), {"@a": 3000, "@b": -3000})
+        self.assertEqual(session.calculate_transfers(), [("@b", "@a", 3000)])
+
+    def test_multiple_transfers_are_aggregated(self) -> None:
+        session = Session(1, "Trip", ["@a", "@b"])
+        session.add_transfer(Transfer(1000, "@b", "@a"))
+        session.add_transfer(Transfer(1500, "@b", "@a"))
+
+        self.assertEqual(session.actual_transfers_cents(), {("@b", "@a"): 2500})
+
+    def test_closed_debt_has_no_calculated_transfers(self) -> None:
+        session = Session(1, "Trip", ["@a", "@b"])
+        session.add_expense(Expense(10000, "@a", ["@a", "@b"], "hotel"))
+        session.add_transfer(Transfer(5000, "@b", "@a"))
+
+        self.assertEqual(session.net_balances_cents(), {"@a": 0, "@b": 0})
+        self.assertEqual(session.calculate_transfers(), [])
 
     def test_rejects_unknown_payer(self) -> None:
         session = Session(1, "Trip", ["@a"])
@@ -43,6 +66,14 @@ class SessionTest(unittest.TestCase):
             session.add_expense(Expense(0, "@a", ["@a"], "coffee"))
 
         self.assertEqual(cm.exception.code, SessionErrorCode.AMOUNT_MUST_BE_POSITIVE)
+
+    def test_rejects_transfer_to_self(self) -> None:
+        session = Session(1, "Trip", ["@a"])
+
+        with self.assertRaises(SessionError) as cm:
+            session.add_transfer(Transfer(100, "@a", "@a"))
+
+        self.assertEqual(cm.exception.code, SessionErrorCode.TRANSFER_TO_SELF)
 
 
 if __name__ == "__main__":

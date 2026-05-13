@@ -9,6 +9,7 @@ _amount_re = re.compile(r"""
     (?P<num>\d+(?:[.,]\d{1,2})?)      # 12 | 12.3 | 12.34 | 12,34
     (?:\s+|$)                         # space or end
 """, re.VERBOSE)
+_amount_token_re = re.compile(r"^\d+(?:[.,]\d{1,2})?$")
 
 
 def _is_mention(token: str) -> bool:
@@ -118,4 +119,55 @@ def parse_message(
         "title": title,
         "payer": payer,
         "participants": participants_unique,
+    }
+
+
+def parse_transfer_message(
+        text: str,
+        author_username: str,
+        session_participants: Iterable[str],
+) -> dict[str, str | int]:
+    tokens = text.strip().split()
+    if not tokens:
+        raise ParseError(ParseErrorCode.INVALID_FORMAT)
+
+    command = tokens[0].split("@", 1)[0]
+    if command != "/transfer":
+        raise ParseError(ParseErrorCode.INVALID_FORMAT)
+
+    args = tokens[1:]
+    if len(args) == 2:
+        if _is_mention(args[0]):
+            sender = args[0]
+            raw_amount = args[1]
+            recipient = author_username
+        elif _is_mention(args[1]):
+            sender = author_username
+            raw_amount = args[0]
+            recipient = args[1]
+        else:
+            raise ParseError(ParseErrorCode.INVALID_FORMAT)
+    elif len(args) == 3 and _is_mention(args[0]) and _is_mention(args[2]):
+        sender = args[0]
+        raw_amount = args[1]
+        recipient = args[2]
+    else:
+        raise ParseError(ParseErrorCode.INVALID_FORMAT)
+
+    if not _amount_token_re.fullmatch(raw_amount):
+        raise ParseError(ParseErrorCode.INVALID_FORMAT)
+
+    amount_cents = _to_cents(raw_amount)
+
+    if sender == recipient:
+        raise ParseError(ParseErrorCode.INVALID_FORMAT)
+
+    session_participants = list(session_participants)
+    if sender not in session_participants or recipient not in session_participants:
+        raise ParseError(ParseErrorCode.UNKNOWN_PEOPLE)
+
+    return {
+        "amount_cents": amount_cents,
+        "sender": sender,
+        "recipient": recipient,
     }

@@ -1,5 +1,7 @@
 # Iryna Finance Bot
 
+[![Telegram](https://img.shields.io/badge/Telegram-@iryna_finance_bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/iryna_finance_bot)
+
 Iryna Finance Bot is a private Telegram bot for tracking shared group expenses. It stores sessions, participants, expenses, payment history, balances, and final transfers in SQLite.
 
 ## Features
@@ -18,8 +20,6 @@ Iryna Finance Bot is a private Telegram bot for tracking shared group expenses. 
 - aiogram 3
 - SQLite
 - python-dotenv
-- zoneinfo/tzdata for Kyiv timezone support
-- Docker
 - Docker Compose
 - GitHub Actions CI/CD
 
@@ -41,36 +41,4 @@ data/                        # Runtime SQLite storage
 Dockerfile                   # Bot image
 docker-compose.yml           # VPS runtime setup
 ```
-
-## Local Setup
-
-Create `.env`:
-
-```env
-BOT_TOKEN=your_telegram_bot_token
-DB_PATH=data/iryna.db
-```
-
-Install and run:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python -m app.main
-```
-
-Run tests:
-
-```bash
-python -m unittest discover -s tests
-```
-
-## Docker
-
-```bash
-docker compose up -d --build
-docker compose logs -f bot
-```
-
 
