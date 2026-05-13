@@ -22,6 +22,13 @@ START_TEXT = (
     "  Рома оплатив, витрата ділиться на всіх учасників сесії\n\n"
     "-1240 @roma бар @andrew\n"
     "  Рома оплатив, витрата ділиться на тебе (автор повідомлення), Рому та Андрія\n\n"
+    "А якщо хтось комусь скинув гроші?\n"
+    "/transfer @misha 1200 @roma\n"
+    "  Міша скинув Ромі 1200\n\n"
+    "/transfer @roma 1200\n"
+    "  Рома скинув тобі 1200\n\n"
+    "/transfer 1200 @roma\n"
+    "  Ти скинув Ромі 1200\n\n"
     "Що далі?\n"
     "• викликай /check щоб все порахувати\n\n"
     "Правила:\n"
@@ -111,6 +118,7 @@ class MSG:
 
     # Expenses
     NO_EXPENSES = "Ще немає витрат. Напиши щось типу: -450 піца"
+    NO_OPERATIONS = NO_EXPENSES
     EXPENSE_SAVED = "Записала ✅"
 
     EXPENSE_SAVED_DETAILS = (
@@ -132,6 +140,28 @@ class MSG:
     EXPENSE_DELETE_CANCELED = "Ок, не видаляю 👌"
     EXPENSE_DELETE_NOT_ACTUAL = "ℹ️ Ця сесія вже неактуальна"
 
+    # Transfers
+    TRANSFER_INVALID_FORMAT = (
+        "❗Невірний формат. Приклад:\n"
+        "/transfer @misha 1200 @roma - Міша скинув Ромі 1200\n"
+        "/transfer @roma 1200 - Рома скинув тобі 1200\n"
+        "/transfer 1200 @roma - Ти скинув Ромі 1200"
+    )
+    TRANSFER_SAVED = "Записала ✅"
+    TRANSFER_LINE = "{sender} → {recipient}: {amount}"
+    TRANSFER_DELETE_BTN = "🗑️ Видалити"
+    TRANSFER_DELETED = "🗑️ Трансфер видалено ✅"
+    TRANSFER_DELETE_ERROR = "Не знайдено або вже видалено"
+    TRANSFER_DELETE_BAD_DATA = "❗ Хибні дані"
+    TRANSFER_DELETE_CONFIRM_TITLE = (
+        "⚠️ Точно хочеш видалити цей трансфер?\n"
+        "Після цього я його вже не поверну"
+    )
+    TRANSFER_DELETE_BTN_YES = "✅ Так, видалити"
+    TRANSFER_DELETE_BTN_NO = "❌ Ні, залишити"
+    TRANSFER_DELETE_CANCELED = "Ок, не видаляю 👌"
+    TRANSFER_DELETE_NOT_ACTUAL = "ℹ️ Ця сесія вже неактуальна"
+
     # Balance / Check
     CHECK_BTN_HISTORY = "🧾 Історія"
     CHECK_BTN_DETAILS = "📊 Деталі"
@@ -144,6 +174,7 @@ class MSG:
     BALANCE_BLOCK_TITLE = "Баланс:\n(+ вам винні, - ви винні)\n{lines}"
     BALANCE_PAID_TITLE = "Хто скільки платив:\n{lines}"
     BALANCE_SPENT_TITLE = "Хто скільки витратив:\n{lines}"
+    BALANCE_TRANSFERS_TITLE = "Хто кому скинув:\n{lines}"
 
     BALANCE_FULL = (
         "{name}\n\n"
@@ -151,6 +182,7 @@ class MSG:
         "____________________________________\n\n"
         "{paid}\n\n"
         "{spent}"
+        "{transfers}"
     )
 
     # History

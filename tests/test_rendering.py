@@ -1,7 +1,9 @@
 import unittest
 
 from app.routers.history import history_nav_kb
+from app.routers.balances.render import build_balance_text
 from app.routers.sessions.parse import parse_new_args
+from app.services.session import Session, Transfer
 from app.utils.currency import format_uah
 
 
@@ -20,6 +22,15 @@ class RenderingHelpersTest(unittest.TestCase):
         self.assertEqual(kb.inline_keyboard[0][0].callback_data, "hist:1")
         self.assertEqual(kb.inline_keyboard[0][1].callback_data, "hist:3")
         self.assertEqual(kb.inline_keyboard[1][0].callback_data, "back")
+
+    def test_balance_text_includes_actual_transfers(self) -> None:
+        session = Session(1, "Trip", ["@a", "@b"])
+        session.add_transfer(Transfer(50000, "@b", "@a"))
+
+        text = build_balance_text(session)
+
+        self.assertIn("Хто кому скинув:", text)
+        self.assertIn("@b → @a: 500.00 грн", text)
 
 
 if __name__ == "__main__":

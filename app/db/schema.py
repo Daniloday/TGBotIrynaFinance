@@ -43,8 +43,21 @@ def init_schema(conn: sqlite3.Connection) -> None:
     )
     """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS transfers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER,
+        sender TEXT,
+        recipient TEXT,
+        amount_cents INTEGER,
+        created_at INTEGER,
+        FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    )
+    """)
+
     c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_chat_created ON sessions(chat_id, created_at)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_expenses_session_created ON expenses(session_id, created_at)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_transfers_session_created ON transfers(session_id, created_at)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_exp_participants_expense ON expense_participants(expense_id)")
 

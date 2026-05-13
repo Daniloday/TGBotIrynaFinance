@@ -3,7 +3,7 @@ import sqlite3
 import time
 from typing import List, Literal
 
-from app.services.session import Session, Expense
+from app.services.session import Session, Expense, Transfer
 from .schema import init_schema
 
 RemoveStatus = Literal["removed", "not_found", "used"]
@@ -54,15 +54,20 @@ class SQLiteRepo:
 
         session = Session(sid=session_id, name=name, participants=parts)
 
-        # (можно оптимизировать позже)
+        self._load_expenses(session)
+        self._load_transfers(session)
+
+        return session
+
+    def _load_expenses(self, session: Session) -> None:
+        cur = self.conn.cursor()
         cur.execute(
             "SELECT id, payer, amount_cents, title, created_at FROM expenses WHERE session_id=? ORDER BY created_at",
-            (session_id,),
+            (session.sid,),
         )
         expenses = cur.fetchall()
-
         if not expenses:
-            return session
+            return
 
         ids = [e["id"] for e in expenses]
         placeholders = ",".join("?" for _ in ids)
@@ -84,7 +89,25 @@ class SQLiteRepo:
                 )
             )
 
-        return session
+    def _load_transfers(self, session: Session) -> None:
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            SELECT sender, recipient, amount_cents
+            FROM transfers
+            WHERE session_id=?
+            ORDER BY created_at
+            """,
+            (session.sid,),
+        )
+        for r in cur.fetchall():
+            session.add_transfer(
+                Transfer(
+                    amount_cents=r["amount_cents"],
+                    sender=r["sender"],
+                    recipient=r["recipient"],
+                )
+            )
 
     # ---------- participants ----------
 
@@ -122,6 +145,18 @@ class SQLiteRepo:
             LIMIT 1
             """,
             (session_id, username),
+        )
+        if cur.fetchone():
+            return False
+
+        cur.execute(
+            """
+            SELECT 1
+            FROM transfers
+            WHERE session_id=? AND (sender=? OR recipient=?)
+            LIMIT 1
+            """,
+            (session_id, username, username),
         )
         return cur.fetchone() is None
 
@@ -231,4 +266,38 @@ class SQLiteRepo:
     def count_expenses(self, session_id: int) -> int:
         cur = self.conn.cursor()
         cur.execute("SELECT COUNT(*) as cnt FROM expenses WHERE session_id=?", (session_id,))
+        return cur.fetchone()["cnt"]
+
+    # ---------- transfers ----------
+
+    def add_transfer(
+        self,
+        session_id: int,
+        sender: str,
+        recipient: str,
+        amount_cents: int,
+    ) -> int:
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO transfers (session_id, sender, recipient, amount_cents, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (session_id, sender, recipient, amount_cents, int(time.time())),
+            )
+            return cur.lastrowid
+
+    def delete_transfer(self, transfer_id: int, session_id: int) -> bool:
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute(
+                "DELETE FROM transfers WHERE id=? AND session_id=?",
+                (transfer_id, session_id),
+            )
+            return cur.rowcount > 0
+
+    def count_transfers(self, session_id: int) -> int:
+        cur = self.conn.cursor()
+        cur.execute("SELECT COUNT(*) as cnt FROM transfers WHERE session_id=?", (session_id,))
         return cur.fetchone()["cnt"]

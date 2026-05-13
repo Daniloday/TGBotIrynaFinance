@@ -1,7 +1,7 @@
 import unittest
 
 from app.domain.errors import ParseError, ParseErrorCode
-from app.utils.parser import parse_message
+from app.utils.parser import parse_message, parse_transfer_message
 
 
 class ParserTest(unittest.TestCase):
@@ -49,6 +49,47 @@ class ParserTest(unittest.TestCase):
     def test_unknown_people_fail(self) -> None:
         with self.assertRaises(ParseError) as cm:
             parse_message("-80 bar @missing", "@author", self.participants)
+
+        self.assertEqual(cm.exception.code, ParseErrorCode.UNKNOWN_PEOPLE)
+
+    def test_transfer_full_format(self) -> None:
+        parsed = parse_transfer_message("/transfer @roma 1200 @anna", "@author", self.participants)
+
+        self.assertEqual(parsed, {
+            "amount_cents": 120000,
+            "sender": "@roma",
+            "recipient": "@anna",
+        })
+
+    def test_transfer_from_author(self) -> None:
+        parsed = parse_transfer_message("/transfer 1200 @anna", "@author", self.participants)
+
+        self.assertEqual(parsed["sender"], "@author")
+        self.assertEqual(parsed["recipient"], "@anna")
+        self.assertEqual(parsed["amount_cents"], 120000)
+
+    def test_transfer_to_author(self) -> None:
+        parsed = parse_transfer_message("/transfer @roma 1200", "@author", self.participants)
+
+        self.assertEqual(parsed["sender"], "@roma")
+        self.assertEqual(parsed["recipient"], "@author")
+        self.assertEqual(parsed["amount_cents"], 120000)
+
+    def test_transfer_invalid_format(self) -> None:
+        with self.assertRaises(ParseError) as cm:
+            parse_transfer_message("/transfer @roma @anna 1200", "@author", self.participants)
+
+        self.assertEqual(cm.exception.code, ParseErrorCode.INVALID_FORMAT)
+
+    def test_transfer_invalid_amount_precision(self) -> None:
+        with self.assertRaises(ParseError) as cm:
+            parse_transfer_message("/transfer @roma 12.345 @anna", "@author", self.participants)
+
+        self.assertEqual(cm.exception.code, ParseErrorCode.INVALID_FORMAT)
+
+    def test_transfer_unknown_people_fail(self) -> None:
+        with self.assertRaises(ParseError) as cm:
+            parse_transfer_message("/transfer @missing 1200 @anna", "@author", self.participants)
 
         self.assertEqual(cm.exception.code, ParseErrorCode.UNKNOWN_PEOPLE)
 
